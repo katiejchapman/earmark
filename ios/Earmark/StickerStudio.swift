@@ -7,9 +7,13 @@ struct GemChoice: Identifiable {
     let color: String
     var id: String { "Gem_\(shape.replacingOccurrences(of: "-", with: "_"))_\(color)" }
     var label: String { "\(color) \(shape.replacingOccurrences(of: "-", with: " ")) gem" }
-    static let all: [GemChoice] = ["heart", "flower", "diamond", "round", "butterfly", "star", "petal-flower", "moon"].flatMap { shape in
-        ["green", "blue", "pink", "yellow", "purple", "silver"].map { GemChoice(shape: shape, color: $0) }
+    // Interleave shapes and colors so every page feels like a mixed sticker sheet.
+    static let all: [GemChoice] = (0..<48).map { index in
+        let shapes = ["heart", "star", "flower", "moon", "diamond", "butterfly", "round", "petal-flower"]
+        let colors = ["green", "blue", "pink", "yellow", "purple", "silver"]
+        return GemChoice(shape: shapes[index % 8], color: colors[(index / 8 + index % 8) % 6])
     }
+
 }
 
 struct PlacedGem: Identifiable, Codable, Equatable {
@@ -21,7 +25,7 @@ struct PlacedGem: Identifiable, Codable, Equatable {
     var rotation: Double = 0
 
     mutating func constrain(to size: CGSize) {
-        self.size = min(120, max(18, self.size))
+        self.size = min(120, max(8, self.size))
         rotation = (rotation.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
         let radians = rotation * .pi / 180
         let inset = self.size / 2 * (abs(cos(radians)) + abs(sin(radians))) + 4
@@ -59,7 +63,7 @@ final class StickerStudioStore: ObservableObject {
                 let decoded = try JSONDecoder().decode([PlacedGem].self, from: Data(contentsOf: file))
                 let assets = Set(GemChoice.all.map(\.id))
                 guard Set(decoded.map(\.id)).count == decoded.count,
-                      decoded.allSatisfy({ assets.contains($0.asset) && $0.x.isFinite && $0.y.isFinite && $0.size.isFinite && $0.rotation.isFinite && (0...1).contains($0.x) && (0...1).contains($0.y) && (18...120).contains($0.size) }) else { throw CocoaError(.fileReadCorruptFile) }
+                      decoded.allSatisfy({ assets.contains($0.asset) && $0.x.isFinite && $0.y.isFinite && $0.size.isFinite && $0.rotation.isFinite && (0...1).contains($0.x) && (0...1).contains($0.y) && (8...120).contains($0.size) }) else { throw CocoaError(.fileReadCorruptFile) }
                 initial = decoded; pristine = false
             } catch { unreadable = true }
         }
@@ -91,7 +95,7 @@ final class StickerStudioStore: ObservableObject {
     func remove(_ id: UUID?) { guard editing, let id else { return }; draft.removeAll { $0.id == id }; if selectedID == id { selectedID = nil } }
     func adjust(_ id: UUID, scale: Double = 1, rotation: Double = 0) {
         guard editing, let index = draft.firstIndex(where: { $0.id == id }) else { return }
-        draft[index].size = min(120, max(18, draft[index].size * scale)); draft[index].rotation += rotation
+        draft[index].size = min(120, max(8, draft[index].size * scale)); draft[index].rotation += rotation
     }
     func layoutDefaults(stereo: CGRect?, controls: CGRect?) {
         guard pristine, !editing, let stereo, let controls, stereo.width > 0, stereo.height > 0 else { return }
@@ -129,13 +133,16 @@ struct StickerDisplay: View {
             .overlay {
                 if studio.editing && studio.selectedID == gem.id {
                     Rectangle().stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: 0.7, dash: [3, 3])).padding(-4)
+                    Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.black).frame(width: 20, height: 20).background(.white, in: Circle())
+                        .offset(x: gem.size / 2 + 8, y: gem.size / 2 + 8).accessibilityHidden(true)
                 }
             }
             .rotationEffect(.degrees(gem.rotation))
             .position(x: size.width * gem.x, y: size.height * gem.y)
             .opacity(studio.activeID == gem.id ? 0 : 1)
         let name = gem.asset.replacingOccurrences(of: "Gem_", with: "").replacingOccurrences(of: "_", with: " ")
-        let accessible = artwork.accessibilityLabel("Placed \(name) sticker")
+        let accessible = artwork.accessibilityElement(children: .ignore).accessibilityAddTraits(.isImage).accessibilityLabel("Placed \(name) sticker")
             .accessibilityValue("Size \(Int(gem.size)), rotation \(Int(gem.rotation)) degrees")
             .accessibilityIdentifier("placedGem-\(gem.id.uuidString)")
         return accessible
@@ -152,7 +159,7 @@ struct StickerSheet: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack {
-                Text("stickers").font(AppType.font(.headline))
+                Text("sticker sheet").font(AppType.font(.headline))
                 Spacer()
                 Button { studio.remove(studio.selectedID) } label: { Image(systemName: "trash").frame(width: 40, height: 40) }
                     .accessibilityLabel("Remove selected sticker").accessibilityIdentifier("stickerTrash")
@@ -188,7 +195,11 @@ struct StickerSheet: View {
             }
         }
         .padding(14)
-        .overlay(RoundedRectangle(cornerRadius: 21).strokeBorder(.secondary.opacity(0.5)))
+        .background {
+            RoundedRectangle(cornerRadius: 3).fill(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.025), .white.opacity(0.10)], startPoint: .topLeading, endPoint: .bottomTrailing))
+        }
+        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(LinearGradient(colors: [.white.opacity(0.75), .gray.opacity(0.25), .white.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing)))
+        .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stickerSheet")
     }
@@ -226,6 +237,10 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         var paging: Bool
         var transformed = false
         var directionChosen = false
+        var handleTransform = false
+        var handleDistance: CGFloat = 1
+        var handleAngle: CGFloat = 0
+        var pageDelta: CGFloat = 0
     }
 
     override init(frame: CGRect) {
@@ -252,19 +267,37 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         guard let stereo = local("stereo") else { return .zero }
         return CGRect(x: stereo.minX + stereo.width * gem.x - gem.size / 2, y: stereo.minY + stereo.height * gem.y - gem.size / 2, width: gem.size, height: gem.size)
     }
+    private func handlePoint(_ gem: PlacedGem) -> CGPoint {
+        let rect = gemRect(gem)
+        let angle = gem.rotation * .pi / 180
+        let distance = gem.size / 2 + 8
+        return CGPoint(x: rect.midX + distance * (cos(angle) - sin(angle)), y: rect.midY + distance * (sin(angle) + cos(angle)))
+    }
+    private func isHandle(_ point: CGPoint, gem: PlacedGem) -> Bool {
+        let handle = handlePoint(gem)
+        return studio?.selectedID == gem.id && hypot(point.x - handle.x, point.y - handle.y) < 23
+    }
+    private func hitGem(_ point: CGPoint) -> PlacedGem? {
+        studio?.draft.reversed().first { isHandle(point, gem: $0) || gemRect($0).insetBy(dx: -max(12, (44 - $0.size) / 2), dy: -max(12, (44 - $0.size) / 2)).contains(point) }
+    }
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         guard studio?.editing == true, bounds.contains(point) else { return nil }
         if session != nil { return self }
         if local("sheet")?.contains(point) == true { return self }
-        if studio?.draft.reversed().contains(where: { gemRect($0).insetBy(dx: -7, dy: -7).contains(point) }) == true { return self }
+        if hitGem(point) != nil { return self }
         return nil
     }
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard session == nil, let touch = touches.first, let studio, studio.editing else { return }
         let point = touch.location(in: self)
-        if let gem = studio.draft.reversed().first(where: { gemRect($0).insetBy(dx: -7, dy: -7).contains(point) }) {
+        if let gem = hitGem(point) {
             let center = CGPoint(x: gemRect(gem).midX, y: gemRect(gem).midY)
             session = Session(gem: gem, existing: true, center: center, origin: point, panBase: center, sizeBase: gem.size, angleBase: gem.rotation, paging: false)
+            if isHandle(point, gem: gem) {
+                session?.handleTransform = true
+                session?.handleDistance = max(1, hypot(point.x - center.x, point.y - center.y))
+                session?.handleAngle = atan2(point.y - center.y, point.x - center.x)
+            }
             studio.selectedID = gem.id; studio.activeID = gem.id
         } else if let choice = studio.choices.first(where: { local($0.id)?.contains(point) == true }) {
             beginSourceSession(choice, at: point)
@@ -284,7 +317,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         }
     }
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if pan.state == .began || pan.state == .changed { return }
+        if [pan!, pinch!, rotation!].contains(where: { $0.state == .began || $0.state == .changed }) { return }
         complete(cancelled: true)
     }
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool { true }
@@ -296,12 +329,22 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
     @objc private func panned(_ gesture: UIPanGestureRecognizer) {
         guard var current = session else { return }
         let delta = gesture.translation(in: self)
+        if current.handleTransform {
+            let point = gesture.location(in: self)
+            let distance = hypot(point.x - current.center.x, point.y - current.center.y)
+            current.gem.size = min(120, max(8, current.sizeBase * distance / current.handleDistance))
+            current.gem.rotation = current.angleBase + (atan2(point.y - current.center.y, point.x - current.center.x) - current.handleAngle) * 180 / .pi
+            session = current; paint()
+            if gesture.state == .ended { endActiveGesture() }
+            else if gesture.state == .cancelled { complete(cancelled: true) }
+            return
+        }
         if !current.directionChosen, hypot(delta.x, delta.y) > 6 {
             current.directionChosen = true
             if !current.existing, !current.transformed, abs(delta.x) > abs(delta.y) * 1.3 { current.paging = true }
         }
         if !current.paging { current.center = CGPoint(x: current.panBase.x + delta.x, y: current.panBase.y + delta.y) }
-        else { current.center = gesture.location(in: self) }
+        else { current.pageDelta = delta.x; current.center = gesture.location(in: self) }
         session = current; paint()
         if gesture.state == .ended { endActiveGesture() }
         else if gesture.state == .cancelled || gesture.state == .failed { complete(cancelled: true) }
@@ -321,7 +364,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
     }
     func scaleActiveGesture(_ scale: CGFloat) {
         guard var current = session, !current.gem.asset.isEmpty else { return }
-        current.gem.size = min(120, max(18, current.sizeBase * scale)); session = current; paint()
+        current.gem.size = min(120, max(8, current.sizeBase * pow(scale, 1.35))); session = current; paint()
     }
     func beginRotation() {
         startTransform()
@@ -353,7 +396,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         defer { session = nil; ghost.isHidden = true; studio.activeID = nil; displayLink?.invalidate(); displayLink = nil }
         guard !cancelled else { return }
         if current.paging {
-            let delta = current.center.x - current.origin.x
+            let delta = current.pageDelta
             if abs(delta) > 25 { withAnimation(.easeOut(duration: 0.15)) { studio.changePage(delta < 0 ? 1 : -1) } }
             return
         }
@@ -378,5 +421,22 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         let minY = -scroll.adjustedContentInset.top
         let maxY = max(minY, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
         scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: min(maxY, max(minY, scroll.contentOffset.y + speed))), animated: false)
+    }
+}
+
+struct StickerSheetIcon: View {
+    var body: some View {
+        Canvas { context, size in
+            let scale = size.width / 24
+            context.scaleBy(x: scale, y: scale)
+            var outline = Path()
+            outline.move(to: CGPoint(x: 4, y: 3)); outline.addLines([CGPoint(x: 20, y: 3), CGPoint(x: 20, y: 16), CGPoint(x: 15, y: 21), CGPoint(x: 4, y: 21), CGPoint(x: 4, y: 3)])
+            outline.move(to: CGPoint(x: 15, y: 21)); outline.addLines([CGPoint(x: 15, y: 16), CGPoint(x: 20, y: 16)])
+            outline.addEllipse(in: CGRect(x: 7.3, y: 6.3, width: 3.4, height: 3.4))
+            outline.move(to: CGPoint(x: 7, y: 13)); outline.addLines([CGPoint(x: 9, y: 16), CGPoint(x: 11, y: 13)])
+            context.stroke(outline, with: .foreground, lineWidth: 1.3)
+            var star = Path(); star.move(to: CGPoint(x: 15, y: 6)); star.addLines([CGPoint(x: 16, y: 8), CGPoint(x: 18, y: 8), CGPoint(x: 16.5, y: 9.5), CGPoint(x: 17, y: 11), CGPoint(x: 15, y: 10), CGPoint(x: 13, y: 11), CGPoint(x: 13.5, y: 9.5), CGPoint(x: 12, y: 8), CGPoint(x: 14, y: 8)]); star.closeSubpath()
+            context.fill(star, with: .foreground)
+        }.accessibilityHidden(true)
     }
 }

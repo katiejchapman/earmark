@@ -25,6 +25,20 @@ final class AudioPlayer: ObservableObject {
     private var source: URL?
     @Published private(set) var sleepDeadline: Date?
     @Published private(set) var sleepRemaining: Double = 0
+    @Published private(set) var scrubReturnDeadline: Date?
+    private var scrubReturnTask: Task<Void, Never>?
+    var visibleScrubReturnPosition: Double? {
+        guard let deadline = scrubReturnDeadline, deadline > Date() else { return nil }
+        return current?.scrubReturnPosition
+    }
+    func expireScrubReturnIfNeeded(now: Date = Date()) {
+        guard let deadline = scrubReturnDeadline, now >= deadline else { return }
+        clearScrubReturn()
+    }
+    private func clearScrubReturn() {
+        if let id = currentID { store.setScrubReturnPosition(nil, for: id) }
+        scrubReturnDeadline = nil; scrubReturnTask?.cancel(); scrubReturnTask = nil
+    }
     private var sleepTask: Task<Void, Never>?
 
     func setSleepTimer(seconds: Double) {
@@ -105,6 +119,7 @@ final class AudioPlayer: ObservableObject {
     func restoreLast() { if currentID == nil, let entry = store.entry(store.data.lastID) { load(entry, autoplay: false) } }
 
     func load(_ entry: Recording, autoplay: Bool = false, refresh: Bool = false) {
+        clearScrubReturn()
         savePosition(); player.pause(); loadTask?.cancel()
         status = nil; player.replaceCurrentItem(with: nil)
         generation = UUID(); let token = generation
@@ -142,7 +157,7 @@ final class AudioPlayer: ObservableObject {
             } catch {
                 guard !Task.isCancelled, generation == token else { return }
                 loading = false; restoring = false; wantsPlayback = false
-                message = error.localizedDescription
+                message = "error"
             }
         }
     }
@@ -155,7 +170,7 @@ final class AudioPlayer: ObservableObject {
                 guard let self, self.generation == token, self.player.currentItem === item else { return }
                 if item.status == .failed {
                     self.loading = false; self.restoring = false; self.wantsPlayback = false
-                    self.message = "Couldn’t play this audio. Tap Play to retry your saved link."
+                    self.message = "error"
                 } else if item.status == .readyToPlay {
                     self.status = nil
                     let seconds = item.duration.seconds
@@ -166,7 +181,7 @@ final class AudioPlayer: ObservableObject {
                             guard let self, self.generation == token else { return }
                             self.restoring = false; self.loading = false
                             if completed { self.position = target }
-                            else { self.message = "Couldn’t restore the listening position. Try loading the link again." }
+                            else { self.message = "error" }
                             if self.wantsPlayback { self.play() }
                             self.updateNowPlaying()
                         }
@@ -192,10 +207,11 @@ final class AudioPlayer: ObservableObject {
             try AVAudioSession.sharedInstance().setActive(true)
             if duration > 0 && position >= duration - 0.2 { seek(0) }
             player.play()
-        } catch { wantsPlayback = false; message = "Audio couldn’t start: \(error.localizedDescription)" }
+        } catch { wantsPlayback = false; message = "error" }
     }
     func pause() { wantsPlayback = false; player.pause(); savePosition(); updateNowPlaying() }
     func stop() {
+        clearScrubReturn()
         cancelSleepTimer()
         savePosition(); loadTask?.cancel(); generation = UUID(); status = nil
         player.pause(); player.replaceCurrentItem(with: nil)
@@ -211,8 +227,15 @@ final class AudioPlayer: ObservableObject {
         guard !restoring, duration > 0 else { return }
         let target = max(0, min(duration, seconds)); let token = generation
         if let id = currentID {
-            if rememberPrevious && abs(target - position) >= 60 {
+            expireScrubReturnIfNeeded()
+            if rememberPrevious && visibleScrubReturnPosition == nil && abs(target - position) >= 60 {
                 store.setScrubReturnPosition(position, for: id)
+                scrubReturnDeadline = Date().addingTimeInterval(30)
+                scrubReturnTask?.cancel()
+                scrubReturnTask = Task { [weak self] in
+                    do { try await Task.sleep(for: .seconds(30)) } catch { return }
+                    self?.expireScrubReturnIfNeeded()
+                }
             }
             // Persist the intended destination before an asynchronous seek can be interrupted.
             store.setPosition(target, for: id)
@@ -226,9 +249,10 @@ final class AudioPlayer: ObservableObject {
         }
     }
     func returnToSavedPosition() {
-        guard !restoring, duration > 0, let entry = current, let saved = entry.scrubReturnPosition else { return }
+        guard !restoring, duration > 0, let entry = current, let saved = visibleScrubReturnPosition else { return }
         seek(saved, rememberPrevious: false)
         store.setScrubReturnPosition(nil, for: entry.id)
+        scrubReturnDeadline = nil; scrubReturnTask?.cancel(); scrubReturnTask = nil
     }
     func skip(_ seconds: Double) { seek(position + seconds) }
     func savePosition() {
@@ -237,6 +261,7 @@ final class AudioPlayer: ObservableObject {
         if seconds.isFinite { store.setPosition(duration > 0 && seconds >= duration - 0.1 ? 0 : seconds, for: id); lastSaved = seconds }
     }
     private func tick() {
+        expireScrubReturnIfNeeded()
         if let deadline = sleepDeadline {
             sleepRemaining = max(0, deadline.timeIntervalSinceNow)
             if sleepRemaining <= 0 { expireSleepTimer() }

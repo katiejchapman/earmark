@@ -49,7 +49,10 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["duplicateNotice"].waitForExistence(timeout: 5))
         app.buttons["sleepTimer"].tap(); app.buttons["15 minutes"].tap()
         XCTAssertTrue(app.staticTexts["sleepCountdown"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["sleepTimer"].label.contains(":"))
+        let active = XCTAttachment(screenshot: app.screenshot()); active.name = "Loaded stereo with sleep countdown"; active.lifetime = .keepAlways; add(active)
         app.buttons["sleepTimer"].tap(); app.buttons["Cancel sleep timer"].tap()
+        XCTAssertTrue(app.staticTexts["sleepCountdown"].waitForNonExistence(timeout: 5))
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Sleep timer cancelled"; screenshot.lifetime = .keepAlways; add(screenshot)
         app.buttons["sleepTimer"].tap()
@@ -57,12 +60,38 @@ final class EarmarkUITests: XCTestCase {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.2)).tap()
     }
 
+    @MainActor func testArchiveWithoutLoadingAndDeleteUndo() {
+        let app = testApp(); app.launch()
+        let field = app.textFields["linkField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap(); field.typeText("https://example.com/archive-only.mp3")
+        app.buttons["archiveLink"].tap()
+        XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "A little listening time")
+        XCTAssertFalse(app.otherElements["loadedLight"].exists)
+        scrollArchive(app)
+        let row = app.buttons["Options for archive-only, Unarchived"]
+        for _ in 0..<3 where !row.isHittable { scrollArchive(app) }
+        XCTAssertTrue(row.exists)
+        row.tap(); app.buttons["Delete"].tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 5))
+        app.buttons["undoDelete"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        app.buttons["Create folder"].tap()
+        app.alerts["New folder"].textFields.firstMatch.typeText("Test folder")
+        app.alerts["New folder"].buttons["Create"].tap()
+        XCTAssertTrue(app.buttons["folderHeader-Test folder"].waitForExistence(timeout: 5))
+        app.buttons["folderHeader-Test folder"].swipeLeft()
+        app.buttons["deleteFolder-Test folder"].tap()
+        app.buttons["undoDelete"].tap()
+        XCTAssertTrue(app.buttons["folderHeader-Test folder"].waitForExistence(timeout: 5))
+    }
+
     @MainActor func testStickerPagesDragAndDonePersist() {
         let app = testApp(); app.launch()
         let decorate = app.buttons["decorateStereo"]
         XCTAssertTrue(decorate.waitForExistence(timeout: 5))
         decorate.tap()
-        for _ in 0..<3 where !app.buttons["stickerSource-Gem_heart_green"].isHittable { scrollArchive(app) }
+        for _ in 0..<3 where app.buttons["stickerSource-Gem_heart_green"].frame.maxY > app.frame.height - 150 { scrollArchive(app) }
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "stickerSource-")).count, 5)
         let source = app.buttons["stickerSource-Gem_heart_green"]
         let target = app.otherElements["stereoPlayer"]
@@ -73,16 +102,27 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(placed.waitForExistence(timeout: 5))
         XCTAssertEqual(placed.frame.midX, dropPoint.x, accuracy: 18)
         XCTAssertEqual(placed.frame.midY, dropPoint.y, accuracy: 18)
+        // Resize and rotate in one movement with the selected sticker's corner handle.
+        let center = CGPoint(x: placed.frame.midX, y: placed.frame.midY)
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let handle = origin.withOffset(CGVector(dx: center.x + 25.5, dy: center.y + 25.5))
+        let smaller = origin.withOffset(CGVector(dx: center.x + 6, dy: center.y - 6))
+        handle.press(forDuration: 0.15, thenDragTo: smaller, withVelocity: .slow, thenHoldForDuration: 0.1)
+        let description = placed.value as? String ?? ""
+        let size = Double(description.components(separatedBy: ",").first?.replacingOccurrences(of: "Size ", with: "") ?? "") ?? 100
+        XCTAssertLessThanOrEqual(size, 12, description)
+        XCTAssertFalse(description.contains("rotation 0 degrees"), description)
+        let sheet = XCTAttachment(screenshot: app.screenshot()); sheet.name = "Glossy sticker sheet and resized gem"; sheet.lifetime = .keepAlways; add(sheet)
         app.buttons["stickerDone"].tap()
         app.terminate(); app.launch()
         let count = app.otherElements["Stereo decorations"]
         XCTAssertTrue(count.waitForExistence(timeout: 5))
         XCTAssertEqual(count.value as? String, "4 stickers")
         app.buttons["decorateStereo"].tap()
-        for _ in 0..<3 where !app.buttons["stickerSource-Gem_heart_green"].isHittable { scrollArchive(app) }
-        let row = app.buttons["stickerSource-Gem_heart_purple"]
+        for _ in 0..<3 where app.buttons["stickerSource-Gem_heart_green"].frame.maxY > app.frame.height - 150 { scrollArchive(app) }
+        let row = app.buttons["stickerSource-Gem_diamond_purple"]
         row.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).press(forDuration: 0.05, thenDragTo: app.buttons["stickerSource-Gem_heart_green"].coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)))
-        XCTAssertTrue(app.buttons["stickerSource-Gem_heart_silver"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["stickerSource-Gem_butterfly_silver"].waitForExistence(timeout: 5))
     }
 
     @MainActor func testDragArchiveEntryIntoFolder() {
@@ -92,12 +132,12 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         link.tap(); link.typeText("https://example.com/\(title).mp3")
         app.buttons["loadLink"].tap()
-        XCTAssertTrue(app.staticTexts["Couldn’t play this audio. Tap Play to retry your saved link."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["error"].waitForExistence(timeout: 15))
         scrollArchive(app)
-        let field = app.textFields["folderName"]
-        for _ in 0..<4 where field.frame.maxY > app.frame.height - 120 { scrollArchive(app) }
-        field.tap(); field.typeText("Listening")
         app.buttons["Create folder"].tap()
+        let field = app.alerts["New folder"].textFields.firstMatch
+        field.tap(); field.typeText("Listening")
+        app.alerts["New folder"].buttons["Create"].tap()
         app.buttons["Expand Unarchived"].tap()
         let item = app.buttons["Options for \(title)"]
         scrollArchive(app)
@@ -115,7 +155,7 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         link.tap(); link.typeText("https://example.com/\(title).mp3")
         app.buttons["loadLink"].tap()
-        XCTAssertTrue(app.staticTexts["Couldn’t play this audio. Tap Play to retry your saved link."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["error"].waitForExistence(timeout: 15))
         scrollArchive(app)
         app.buttons["Expand Unarchived"].tap()
         let item = app.buttons["Options for \(title)"]
@@ -144,7 +184,7 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         link.tap(); link.typeText("https://example.com/reset-ui-\(UUID().uuidString).mp3")
         app.buttons["loadLink"].tap()
-        let error = app.staticTexts["Couldn’t play this audio. Tap Play to retry your saved link."]
+        let error = app.staticTexts["error"]
         XCTAssertTrue(error.waitForExistence(timeout: 15))
         XCTAssertLessThan(app.buttons["importAudio"].frame.maxY, error.frame.minY)
         app.buttons["resetPlayer"].tap()
@@ -162,15 +202,15 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         link.tap(); link.typeText(url)
         app.buttons["loadLink"].tap()
-        XCTAssertTrue(app.staticTexts["Couldn’t play this audio. Tap Play to retry your saved link."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["error"].waitForExistence(timeout: 15))
         scrollArchive(app)
         let folderName = "Favorites-\(Int(Date().timeIntervalSince1970))"
-        let field = app.textFields["folderName"]
+        app.buttons["Create folder"].tap()
+        let field = app.alerts["New folder"].textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
-        for _ in 0..<4 where field.frame.maxY > app.frame.height - 120 { scrollArchive(app) }
         field.tap(); field.typeText(folderName)
         XCTAssertEqual(field.value as? String, folderName)
-        app.buttons["Create folder"].tap()
+        app.alerts["New folder"].buttons["Create"].tap()
         XCTAssertTrue(app.buttons["folderHeader-\(folderName)"].waitForExistence(timeout: 5))
         app.terminate(); app.launch(); scrollArchive(app)
         XCTAssertTrue(app.buttons["folderHeader-\(folderName)"].waitForExistence(timeout: 5))
@@ -203,6 +243,10 @@ final class EarmarkUITests: XCTestCase {
         let before = theme.label
         theme.tap()
         XCTAssertNotEqual(theme.label, before)
+        app.buttons["decorateStereo"].tap()
+        scrollArchive(app)
+        let lightSheet = XCTAttachment(screenshot: app.screenshot()); lightSheet.name = "Sticker sheet alternate theme"; lightSheet.lifetime = .keepAlways; add(lightSheet)
+        app.buttons["stickerDone"].tap()
         app.terminate(); app.launch()
         XCTAssertNotEqual(app.buttons["themeToggle"].label, before)
         app.buttons["themeToggle"].tap()

@@ -37,6 +37,8 @@ struct ContentView: View {
     @State private var exporting = false
     @State private var importing = false
     @State private var importingAudio = false
+    @State private var archiveOnlyImport = false
+    @State private var creatingFolder = false
     @State private var backup = LibraryDocument()
     @State private var pendingRestore: Data?
     @State private var confirmingRestore = false
@@ -53,7 +55,6 @@ struct ContentView: View {
     @State private var draggingID: UUID?
     @State private var dragLocation = CGPoint.zero
     @State private var linkFocused = false
-    @FocusState private var folderFocused: Bool
 
     private var paper: Color { dark ? Color(red: 0.10, green: 0.09, blue: 0.12) : Color(red: 0.94, green: 0.91, blue: 0.89) }
     private var card: Color { dark ? Color(red: 0.16, green: 0.14, blue: 0.18) : Color(red: 0.98, green: 0.96, blue: 0.94) }
@@ -68,8 +69,6 @@ struct ContentView: View {
                 playerCard
                 if studio.editing { StickerSheet(studio: studio) }
                 library
-                Text("Links stream online. Imported audio plays offline. Library backups save links, folders, and positions; keep a separate copy of imported audio before deleting the app.")
-                     .font(AppType.font(.caption1)).foregroundStyle(.secondary)
                 if let error = store.storageError { Text(error).font(AppType.font(.footnote)).foregroundStyle(.red).accessibilityIdentifier("storageError") }
             }
             .frame(maxWidth: 580)
@@ -82,14 +81,6 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .buttonStyle(.borderless)
         .scrollDismissesKeyboard(.interactively)
-        .onChange(of: folderFocused) { _, focused in
-            if focused {
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
-                    withAnimation { proxy.scrollTo("folderInput", anchor: .center) }
-                }
-            }
-        }
         } // ScrollViewReader
         .background(paper.ignoresSafeArea())
         .overlay {
@@ -146,7 +137,7 @@ struct ContentView: View {
                         let entry = try store.importAudio(url)
                         if first == nil { first = entry }
                     }
-                    if let first { player.load(first) }
+                    if let first, !archiveOnlyImport { player.load(first) }
                 } else if let url = urls.first {
                     let accessed = url.startAccessingSecurityScopedResource()
                     defer { if accessed { url.stopAccessingSecurityScopedResource() } }
@@ -172,6 +163,20 @@ struct ContentView: View {
         .alert("Earmark", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("OK") { notice = nil }
         } message: { Text(notice ?? "") }
+        .safeAreaInset(edge: .bottom) {
+            if store.canUndoDelete {
+                HStack {
+                    Text("deleted").font(AppType.font(.subheadline))
+                    Spacer()
+                    Button("undo") { store.undoDelete() }.accessibilityIdentifier("undoDelete")
+                }.padding(14).background(.regularMaterial)
+            }
+        }
+        .alert("New folder", isPresented: $creatingFolder) {
+            TextField("Folder name", text: $folder).accessibilityIdentifier("folderName")
+            Button("Create", action: createFolder)
+            Button("Cancel", role: .cancel) { folder = "" }
+        }
         .alert("Rename folder", isPresented: Binding(get: { renamingFolder != nil }, set: { if !$0 { renamingFolder = nil } })) {
             TextField("Folder name", text: $renamedFolder)
             Button("Save") {
@@ -213,12 +218,20 @@ struct ContentView: View {
                     .accessibilityIdentifier("loadLink")
             }
             HStack(alignment: .top) {
+                Button {
+                    do { _ = try store.remember(link); linkFocused = false }
+                    catch { notice = error.localizedDescription }
+                } label: { Image(systemName: "tray.and.arrow.down").frame(width: 34, height: 44) }
+                    .accessibilityLabel("Add link to archive").accessibilityIdentifier("archiveLink")
                 Spacer(minLength: 8)
-                Button { importingAudio = true; importing = true } label: {
-                    Label("add file", systemImage: "folder.badge.plus").symbolRenderingMode(.monochrome)
+                Button { archiveOnlyImport = false; importingAudio = true; importing = true } label: {
+                    HStack(spacing: 3) { Image(systemName: "folder.badge.plus"); Text("add file") }.symbolRenderingMode(.monochrome)
                         .font(AppType.font(.caption1)).foregroundStyle(rose).frame(minHeight: 44)
                 }
                     .accessibilityIdentifier("importAudio")
+                Button { archiveOnlyImport = true; importingAudio = true; importing = true } label: {
+                    Image(systemName: "tray.and.arrow.down").frame(width: 34, height: 44)
+                }.accessibilityLabel("Add files to archive").accessibilityIdentifier("archiveFile")
             }
             if let duplicate = store.duplicateNotice {
                 Text(duplicate).font(AppType.font(.caption1)).foregroundStyle(rose).accessibilityIdentifier("duplicateNotice")
@@ -237,11 +250,6 @@ struct ContentView: View {
         VStack(spacing: 12) {
             Gems(count: 13).padding(.horizontal, 10).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(player.loading ? "LOADING" : "▶ NOW PLAYING").font(.system(size: 9, design: .monospaced)).tracking(2)
-                    Spacer()
-                    if player.loading { ProgressView().controlSize(.mini).tint(.black) }
-                }
                 Text(player.current?.title ?? "A little listening time")
                     .font(.system(size: 19, weight: .semibold, design: .monospaced)).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("nowPlayingTitle")
@@ -272,7 +280,7 @@ struct ContentView: View {
             .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(LinearGradient(colors: [Color(hex: 0x383c40).opacity(0.8), Color(hex: 0x9a9f98).opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 5))
             .shadow(color: .white.opacity(dark ? 0.16 : 0.45), radius: 0, x: 0, y: 1)
             VStack(spacing: 0) {
-                SilverScrubber(value: Binding(get: { scrub ?? player.position }, set: { scrub = $0 }), duration: player.duration, enabled: player.duration > 0 && !player.loading, savedPosition: player.current?.scrubReturnPosition, onReturn: { player.returnToSavedPosition(); scrub = nil }) {
+                SilverScrubber(value: Binding(get: { scrub ?? player.position }, set: { scrub = $0 }), duration: player.duration, enabled: player.duration > 0 && !player.loading, savedPosition: player.visibleScrubReturnPosition, onReturn: { player.returnToSavedPosition(); scrub = nil }) {
                     if let scrub { player.seek(scrub) }; scrub = nil
                 }
                 HStack {
@@ -286,29 +294,14 @@ struct ContentView: View {
                 controls
             }
             HStack {
-                Menu {
-                    ForEach([5, 15, 30], id: \.self) { minutes in
-                        Button("\(minutes) minutes") { player.setSleepTimer(seconds: Double(minutes * 60)) }
-                    }
-                    if player.sleepDeadline != nil {
-                        Button("Cancel sleep timer", role: .destructive) { player.cancelSleepTimer() }.buttonStyle(.automatic)
-                    }
-                } label: {
-                    Text("sleep")
-                        .font(AppType.fixed(11))
-                        .frame(width: 58, height: 26)
-                        .foregroundStyle(player.sleepDeadline == nil ? Color.primary : Color(hex: 0x583346))
-                        .background(player.sleepDeadline == nil ? Color.clear : rose, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
-                        .frame(minHeight: 44).contentShape(Rectangle())
-                }.accessibilityLabel("Sleep timer").accessibilityIdentifier("sleepTimer")
+                SleepControl(player: player, active: player.sleepDeadline != nil, dark: dark).equatable()
                 Spacer()
                 Button { studio.editing ? studio.finish() : studio.begin() } label: {
-                    Label("decorate", systemImage: "square.grid.2x2").font(AppType.fixed(10))
+                    StickerSheetIcon().frame(width: 20, height: 21)
                         .padding(.horizontal, 9).frame(height: 26)
                         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
                         .frame(minHeight: 44)
-                }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityIdentifier("decorateStereo")
+                }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityLabel("Decorate stereo").accessibilityIdentifier("decorateStereo")
                 Spacer()
             Button {
                 store.duplicateNotice = nil
@@ -322,6 +315,16 @@ struct ContentView: View {
             .buttonStyle(.plain).accessibilityIdentifier("resetPlayer")
             }
             Speaker(dark: dark).frame(height: 22).padding(.horizontal, 7).padding(.top, 6).accessibilityHidden(true)
+                .overlay(alignment: .topLeading) {
+                    if player.currentID != nil {
+                        Circle().fill(RadialGradient(colors: [Color(hex: 0xffd5cf), Color(hex: 0xff243d), Color(hex: 0x9a0020)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 7))
+                            .frame(width: 11, height: 11)
+                            .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1))
+                            .shadow(color: .red.opacity(0.85), radius: 5)
+                            .offset(x: 9, y: -13)
+                            .accessibilityLabel("Audio loaded").accessibilityIdentifier("loadedLight")
+                    }
+                }
             Gems(count: 13).padding(.horizontal, 10).padding(.top, 4).accessibilityHidden(true)
         }
         .padding(20)
@@ -372,6 +375,9 @@ struct ContentView: View {
             HStack {
                 Text("archive").font(AppType.font(.title2, weight: 600))
                 Spacer()
+                Button { folder = ""; creatingFolder = true } label: {
+                    Image(systemName: "plus").frame(width: 44, height: 44)
+                }.accessibilityLabel("Create folder")
                 Menu {
                     Button("Export library", systemImage: "square.and.arrow.up") {
                         do { player.savePosition(); backup = LibraryDocument(data: try store.exportData()); exporting = true }
@@ -380,12 +386,6 @@ struct ContentView: View {
                     Button("Restore backup", systemImage: "square.and.arrow.down") { importingAudio = false; importing = true }
                 } label: { Image(systemName: "ellipsis.circle").frame(width: 44, height: 44) }.accessibilityLabel("Library options")
             }
-            HStack {
-                TextField("Folder name", text: $folder).padding(12).background(card, in: RoundedRectangle(cornerRadius: 12)).accessibilityIdentifier("folderName")
-                    .focused($folderFocused).submitLabel(.done).onSubmit(createFolder)
-                Button(action: createFolder) { Image(systemName: "plus").font(.title2).frame(width: 44, height: 44).background(card, in: RoundedRectangle(cornerRadius: 12)) }
-                    .accessibilityLabel("Create folder")
-            }.id("folderInput")
             if store.data.entries.isEmpty && store.data.folders.isEmpty {
                 Text("Your pasted links will appear here.").font(AppType.font(.subheadline)).foregroundStyle(.secondary).padding(.vertical, 10)
             }
@@ -398,7 +398,7 @@ struct ContentView: View {
             }
         }
     }
-    private func createFolder() { _ = store.addFolder(folder); folder = ""; folderFocused = false }
+    private func createFolder() { _ = store.addFolder(folder); folder = "" }
     @ViewBuilder private func folderView(_ folder: String?) -> some View {
         let entries = store.data.entries.filter { $0.folder == folder }
         let key = folder ?? ""
@@ -587,6 +587,30 @@ private struct LinkInput: UIViewRepresentable {
     }
 }
 
+// Keep the open system menu stable while the LCD countdown updates every second.
+private struct SleepControl: View, Equatable {
+    let player: AudioPlayer
+    let active: Bool
+    let dark: Bool
+    static func == (lhs: Self, rhs: Self) -> Bool { lhs.player === rhs.player && lhs.active == rhs.active && lhs.dark == rhs.dark }
+    var body: some View {
+        Menu {
+            ForEach([5, 15, 30], id: \.self) { minutes in
+                Button("\(minutes) minutes") { player.setSleepTimer(seconds: Double(minutes * 60)) }
+            }
+            if active {
+                Button("Cancel sleep timer", role: .destructive) { player.cancelSleepTimer() }.buttonStyle(.automatic)
+            }
+        } label: {
+            Text("sleep").font(AppType.fixed(11)).frame(width: 58, height: 26)
+                .foregroundStyle(active ? Color(hex: 0x583346) : Color.primary)
+                .background(active ? rose : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
+                .frame(minHeight: 44).contentShape(Rectangle())
+        }.buttonStyle(.automatic).accessibilityLabel("Sleep timer").accessibilityIdentifier("sleepTimer")
+    }
+}
+
 private struct Disc: View {
     var body: some View {
         Image("Disc").resizable().scaledToFit()
@@ -610,9 +634,9 @@ private struct SilverScrubber: View {
                     .overlay(alignment: .bottom) { Capsule().fill(.white.opacity(0.45)).frame(height: 1).offset(y: 1) }
                 Capsule().fill(Color(hex: 0xb85280)).frame(width: 8 + width * fraction, height: 4)
                 if let saved = savedPosition, duration > 0 {
-                    Capsule().fill(Color(hex: 0xf1f2ee)).frame(width: 12, height: 3)
-                        .shadow(color: .black.opacity(0.5), radius: 0, y: 1)
-                        .offset(x: 2 + width * min(1, max(0, saved / duration)), y: 7)
+                    Rectangle().fill(Color.black.opacity(0.65)).frame(width: 2, height: 4)
+                        .overlay(alignment: .trailing) { Rectangle().fill(.white.opacity(0.55)).frame(width: 0.5) }
+                        .offset(x: min(geometry.size.width - 2, max(0, 7 + width * min(1, max(0, saved / duration)))))
                         .accessibilityHidden(true)
                 }
                 Circle().fill(RadialGradient(colors: [Color.white, Color(hex: 0xdce0df), Color(hex: 0xaeb5b7), Color(hex: 0x737c80)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 12))

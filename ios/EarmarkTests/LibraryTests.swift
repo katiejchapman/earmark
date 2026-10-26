@@ -6,6 +6,39 @@ import UIKit
 final class LibraryTests: XCTestCase {
     private func temporaryFile() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("library.json") }
 
+    @MainActor func testDeleteUndoKeepsLocalAudioAndInterveningProgress() throws {
+        let file = temporaryFile(); let store = LibraryStore(file: file)
+        let entry = try store.remember("https://example.com/keep.mp3")
+        store.move(entry.id, to: store.addFolder("Favorites"))
+        store.deleteFolder("Favorites")
+        XCTAssertNil(store.entry(entry.id)?.folder)
+        store.setPosition(42, for: entry.id)
+        let newer = try store.remember("https://example.com/new.mp3")
+        store.undoDelete()
+        XCTAssertEqual(store.entry(entry.id)?.folder, "Favorites")
+        XCTAssertEqual(store.entry(entry.id)?.position, 42)
+        XCTAssertNotNil(store.entry(newer.id))
+        let incoming = file.deletingLastPathComponent().appendingPathComponent("undo.m4a")
+        try Data([1, 2, 3]).write(to: incoming)
+        let local = try store.importAudio(incoming)
+        store.delete(local.id)
+        XCTAssertTrue(store.canUndoDelete)
+        XCTAssertNil(store.entry(local.id))
+        store.undoDelete()
+        XCTAssertEqual(store.entry(local.id), local)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(store.playbackURL(for: local)).path))
+        XCTAssertFalse(store.canUndoDelete)
+    }
+
+    @MainActor func testUndoDoesNotDuplicateReaddedRecording() throws {
+        let store = LibraryStore(file: temporaryFile())
+        let old = try store.remember("https://example.com/same.mp3")
+        store.delete(old.id)
+        let new = try store.remember("https://example.com/same.mp3")
+        store.undoDelete()
+        XCTAssertEqual(store.data.entries.map(\.id), [new.id])
+    }
+
     @MainActor func testRenamedURLAndFileReportAlreadySavedWithoutDuplicates() throws {
         let file = temporaryFile(); let store = LibraryStore(file: file)
         let original = try store.remember("https://example.com/original-name.mp3")
@@ -47,11 +80,26 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(studio.draft.count, 3) // The source is not consumed before placement.
         view.moveActiveGesture(to: CGPoint(x: 160, y: 210)); view.endActiveGesture()
         XCTAssertEqual(studio.draft.count, 4)
-        XCTAssertEqual(studio.draft.last?.size ?? 0, 63, accuracy: 0.1)
+        XCTAssertEqual(studio.draft.last?.size ?? 0, 35 * pow(1.8, 1.35), accuracy: 0.1)
         XCTAssertEqual(studio.draft.last?.rotation ?? 0, 30, accuracy: 0.1)
         studio.finish()
-        XCTAssertEqual(StickerStudioStore(file: file).saved.last?.size ?? 0, 63, accuracy: 0.1)
+        XCTAssertEqual(StickerStudioStore(file: file).saved.last?.size ?? 0, 35 * pow(1.8, 1.35), accuracy: 0.1)
         XCTAssertEqual(GemChoice.all.count, 48)
+    }
+
+    @MainActor func testPinchCanShrinkGemToEightPointsAndPersist() throws {
+        let file = temporaryFile().deletingLastPathComponent().appendingPathComponent("decorations.json")
+        let studio = StickerStudioStore(file: file); studio.begin()
+        let view = StickerTouchView(frame: CGRect(x: 0, y: 0, width: 320, height: 600))
+        view.studio = studio; view.frames = ["stereo": CGRect(x: 0, y: 0, width: 320, height: 400)]
+        view.beginSourceSession(GemChoice.all[0], at: CGPoint(x: 150, y: 500))
+        view.beginPinch(); view.scaleActiveGesture(0.1)
+        view.beginRotation(); view.rotateActiveGesture(.pi / 2)
+        view.moveActiveGesture(to: CGPoint(x: 160, y: 210)); view.endActiveGesture()
+        studio.finish()
+        let saved = StickerStudioStore(file: file).saved.last
+        XCTAssertEqual(saved?.size, 8)
+        XCTAssertEqual(saved?.rotation, 90)
     }
 
     @MainActor func testStickerLayoutTransformPersistenceAndFiveItemPages() throws {
@@ -59,6 +107,8 @@ final class LibraryTests: XCTestCase {
         let studio = StickerStudioStore(file: file)
         XCTAssertEqual(GemChoice.all.count, 48)
         XCTAssertEqual(studio.choices.count, 5)
+        XCTAssertEqual(Set(studio.choices.map(\.shape)).count, 5)
+        XCTAssertEqual(Set(GemChoice.all.map(\.id)).count, 48)
         XCTAssertTrue(GemChoice.all.allSatisfy { UIImage(named: $0.id) != nil })
         let firstPage = studio.choices.map(\.id)
         studio.changePage(1)
@@ -119,6 +169,9 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(LibraryStore(file: library).entry(entry.id)?.position, 100)
         XCTAssertEqual(store.entry(entry.id)?.scrubReturnPosition ?? -1, 12, accuracy: 0.2)
         try await Task.sleep(for: .milliseconds(300))
+        player.seek(175)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(store.entry(entry.id)?.scrubReturnPosition ?? -1, 12, accuracy: 0.2)
         player.returnToSavedPosition()
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(player.position, 12, accuracy: 0.2)
@@ -126,8 +179,17 @@ final class LibraryTests: XCTestCase {
         player.skip(15)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
+        player.seek(120)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertNotNil(player.visibleScrubReturnPosition)
+        player.expireScrubReturnIfNeeded(now: Date().addingTimeInterval(31))
+        XCTAssertNil(player.visibleScrubReturnPosition)
+        XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
         player.play()
         for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertTrue(player.playing)
+        _ = try store.remember("https://example.com/queued-while-playing.mp3")
+        XCTAssertEqual(player.currentID, entry.id)
         XCTAssertTrue(player.playing)
         player.setSleepTimer(seconds: 0.1)
         try await Task.sleep(for: .milliseconds(400))
@@ -406,7 +468,10 @@ final class LibraryTests: XCTestCase {
         try reopened.restore(backup)
         XCTAssertEqual(reopened.entry(entry.id)?.localFilename, entry.localFilename)
         reopened.delete(entry.id)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: store.audioDirectory.appendingPathComponent(entry.localFilename!).path))
+        XCTAssertNil(reopened.entry(entry.id))
+        reopened.undoDelete()
+        XCTAssertNotNil(reopened.entry(entry.id))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.audioDirectory.appendingPathComponent(entry.localFilename!).path))
     }
 
     @MainActor func testImportedMP4PlaysFromItsSavedCopy() async throws {

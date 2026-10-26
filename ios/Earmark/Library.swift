@@ -32,6 +32,8 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var data = LibraryData()
     @Published var storageError: String?
     @Published var duplicateNotice: String?
+    @Published private(set) var canUndoDelete = false
+    private var deletionUndo: LibraryData?
     private let file: URL
     private var readable = true
 
@@ -199,21 +201,44 @@ final class LibraryStore: ObservableObject {
     }
 
     func delete(_ id: UUID) {
-        if let name = entry(id)?.localFilename {
-            try? FileManager.default.removeItem(at: audioDirectory.appendingPathComponent(name))
-        }
+        deletionUndo = data; canUndoDelete = true
+        // Keep the local bytes so undo can restore offline audio as well as its metadata.
         data.entries.removeAll { $0.id == id }
         if data.lastID == id { data.lastID = nil }
         save()
     }
 
     func deleteFolder(_ folder: String) {
+        deletionUndo = data; canUndoDelete = true
         data.folders.removeAll { $0 == folder }
         for i in data.entries.indices where data.entries[i].folder == folder {
             data.entries[i].folder = nil
             data.entries[i].manualFolder = true
         }
         save()
+    }
+
+    func undoDelete() {
+        guard let previous = deletionUndo else { return }
+        // Restore only deleted records and folder assignments; preserve intervening additions and progress.
+        let oldIDs = Set(previous.entries.map(\.id))
+        let currentIDs = Set(data.entries.map(\.id))
+        let missing = previous.entries.filter { deleted in
+            !currentIDs.contains(deleted.id) && !data.entries.contains { existing in
+                if let hash = deleted.contentHash, existing.contentHash == hash { return true }
+                return deleted.localFilename == nil && matches(existing, url: deleted.url)
+            }
+        }
+        data.entries.append(contentsOf: missing)
+        for folder in previous.folders where !data.folders.contains(folder) {
+            data.folders.append(folder)
+            for index in data.entries.indices where oldIDs.contains(data.entries[index].id) {
+                if previous.entries.first(where: { $0.id == data.entries[index].id })?.folder == folder {
+                    data.entries[index].folder = folder
+                }
+            }
+        }
+        deletionUndo = nil; canUndoDelete = false; save()
     }
 
     @discardableResult func renameFolder(_ old: String, to proposed: String) -> String? {
@@ -260,6 +285,7 @@ final class LibraryStore: ObservableObject {
         // Persist first: a failed restore must not replace the in-memory library.
         try write(try JSONEncoder().encode(incoming))
         data = incoming; readable = true; storageError = nil
+        deletionUndo = nil; canUndoDelete = false
     }
     private func write(_ bytes: Data) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
