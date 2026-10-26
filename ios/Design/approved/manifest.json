@@ -1,0 +1,210 @@
+[
+  {
+    "name": "Gem_butterfly_blue",
+    "source": "gems/Gem_butterfly_blue.svg"
+  },
+  {
+    "name": "Gem_butterfly_green",
+    "source": "gems/Gem_butterfly_green.svg"
+  },
+  {
+    "name": "Gem_butterfly_pink",
+    "source": "gems/Gem_butterfly_pink.svg"
+  },
+  {
+    "name": "Gem_butterfly_purple",
+    "source": "gems/Gem_butterfly_purple.svg"
+  },
+  {
+    "name": "Gem_butterfly_silver",
+    "source": "gems/Gem_butterfly_silver.svg"
+  },
+  {
+    "name": "Gem_butterfly_yellow",
+    "source": "gems/Gem_butterfly_yellow.svg"
+  },
+  {
+    "name": "Gem_diamond_blue",
+    "source": "gems/Gem_diamond_blue.svg"
+  },
+  {
+    "name": "Gem_diamond_green",
+    "source": "gems/Gem_diamond_green.svg"
+  },
+  {
+    "name": "Gem_diamond_pink",
+    "source": "gems/Gem_diamond_pink.svg"
+  },
+  {
+    "name": "Gem_diamond_purple",
+    "source": "gems/Gem_diamond_purple.svg"
+  },
+  {
+    "name": "Gem_diamond_silver",
+    "source": "gems/Gem_diamond_silver.svg"
+  },
+  {
+    "name": "Gem_diamond_yellow",
+    "source": "gems/Gem_diamond_yellow.svg"
+  },
+  {
+    "name": "Gem_flower_blue",
+    "source": "gems/Gem_flower_blue.svg"
+  },
+  {
+    "name": "Gem_flower_green",
+    "source": "gems/Gem_flower_green.svg"
+  },
+  {
+    "name": "Gem_flower_pink",
+    "source": "gems/Gem_flower_pink.svg"
+  },
+  {
+    "name": "Gem_flower_purple",
+    "source": "gems/Gem_flower_purple.svg"
+  },
+  {
+    "name": "Gem_flower_silver",
+    "source": "gems/Gem_flower_silver.svg"
+  },
+  {
+    "name": "Gem_flower_yellow",
+    "source": "gems/Gem_flower_yellow.svg"
+  },
+  {
+    "name": "Gem_heart_blue",
+    "source": "gems/Gem_heart_blue.svg"
+  },
+  {
+    "name": "Gem_heart_green",
+    "source": "gems/Gem_heart_green.svg"
+  },
+  {
+    "name": "Gem_heart_pink",
+    "source": "gems/Gem_heart_pink.svg"
+  },
+  {
+    "name": "Gem_heart_purple",
+    "source": "gems/Gem_heart_purple.svg"
+  },
+  {
+    "name": "Gem_heart_silver",
+    "source": "gems/Gem_heart_silver.svg"
+  },
+  {
+    "name": "Gem_heart_yellow",
+    "source": "gems/Gem_heart_yellow.svg"
+  },
+  {
+    "name": "Gem_moon_blue",
+    "source": "gems/Gem_moon_blue.svg"
+  },
+  {
+    "name": "Gem_moon_green",
+    "source": "gems/Gem_moon_green.svg"
+  },
+  {
+    "name": "Gem_moon_pink",
+    "source": "gems/Gem_moon_pink.svg"
+  },
+  {
+    "name": "Gem_moon_purple",
+    "source": "gems/Gem_moon_purple.svg"
+  },
+  {
+    "name": "Gem_moon_silver",
+    "source": "gems/Gem_moon_silver.svg"
+  },
+  {
+    "name": "Gem_moon_yellow",
+    "source": "gems/Gem_moon_yellow.svg"
+  },
+  {
+    "name": "Gem_petal_flower_blue",
+    "source": "gems/Gem_petal_flower_blue.svg"
+  },
+  {
+    "name": "Gem_petal_flower_green",
+    "source": "gems/Gem_petal_flower_green.svg"
+  },
+  {
+    "name": "Gem_petal_flower_pink",
+    "source": "gems/Gem_petal_flower_pink.svg"
+  },
+  {
+    "name": "Gem_petal_flower_purple",
+    "source": "gems/Gem_petal_flower_purple.svg"
+  },
+  {
+    "name": "Gem_petal_flower_silver",
+    "source": "gems/Gem_petal_flower_silver.svg"
+  },
+  {
+    "name": "Gem_petal_flower_yellow",
+    "source": "gems/Gem_petal_flower_yellow.svg"
+  },
+  {
+    "name": "Gem_round_blue",
+    "source": "gems/Gem_round_blue.svg"
+  },
+  {
+    "name": "Gem_round_green",
+    "source": "gems/Gem_round_green.svg"
+  },
+  {
+    "name": "Gem_round_pink",
+    "source": "gems/Gem_round_pink.svg"
+  },
+  {
+    "name": "Gem_round_purple",
+    "source": "gems/Gem_round_purple.svg"
+  },
+  {
+    "name": "Gem_round_silver",
+    "source": "gems/Gem_round_silver.svg"
+  },
+  {
+    "name": "Gem_round_yellow",
+    "source": "gems/Gem_round_yellow.svg"
+  },
+  {
+    "name": "Gem_star_blue",
+    "source": "gems/Gem_star_blue.svg"
+  },
+  {
+    "name": "Gem_star_green",
+    "source": "gems/Gem_star_green.svg"
+  },
+  {
+    "name": "Gem_star_pink",
+    "source": "gems/Gem_star_pink.svg"
+  },
+  {
+    "name": "Gem_star_purple",
+    "source": "gems/Gem_star_purple.svg"
+  },
+  {
+    "name": "Gem_star_silver",
+    "source": "gems/Gem_star_silver.svg"
+  },
+  {
+    "name": "Gem_star_yellow",
+    "source": "gems/Gem_star_yellow.svg"
+  },
+  {
+    "name": "Disc",
+    "source": "Disc.svg",
+    "size": 1024
+  },
+  {
+    "name": "AppIcon",
+    "source": "AppIcon.svg",
+    "size": 1024
+  },
+  {
+    "name": "Wordmark",
+    "source": "Wordmark.svg",
+    "width": 1200,
+    "height": 340
+  }
+]

@@ -1,0 +1,67 @@
+name: Earmark
+options:
+  bundleIdPrefix: com.katiechapman
+  deploymentTarget:
+    iOS: '17.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    DEVELOPMENT_TEAM: ''
+targets:
+  Earmark:
+    type: application
+    platform: iOS
+    sources: [Earmark]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.katiechapman.earmark
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: earmark
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIBackgroundModes: audio
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoadsForMedia: YES
+        MARKETING_VERSION: '1.0'
+        CURRENT_PROJECT_VERSION: '1'
+    info:
+      path: Earmark/Info.plist
+      properties:
+        UIAppFonts: [Modak-Regular.ttf, Quicksand.ttf]
+        UIBackgroundModes: [audio]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Audio recording
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.audio, public.mpeg-4-audio, public.mp3, com.microsoft.waveform-audio, public.mpeg-4, public.movie]
+        LSSupportsOpeningDocumentsInPlace: true
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoadsForMedia: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+  EarmarkTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [EarmarkTests]
+    dependencies:
+      - target: Earmark
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  EarmarkUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [EarmarkUITests]
+    dependencies:
+      - target: Earmark
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Earmark:
+    build:
+      targets:
+        Earmark: all
+    test:
+      targets: [EarmarkTests, EarmarkUITests]

@@ -1,0 +1,16 @@
+# Personal listening libraries and audio backups stay on this Mac.
+/backups/
+# Local build/editor state
+.DS_Store
+**/xcuserdata/
+*.xcuserstate
+*.xcresult
+DerivedData/
+build/
+node_modules/
+.env
+.env.*
+*.p12
+*.mobileprovision
+.codex/
+.agents/

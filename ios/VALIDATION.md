@@ -1,0 +1,67 @@
+# Validation
+
+- Xcode 26.6; iPhone 17 Pro simulator running iOS 26.5.
+- 20 checks covered: 14 library/resolver/playback checks and 6 interface checks. The full run passed 19; after correcting tap/drag gesture composition, both affected archive interaction checks passed in a focused rerun.
+- Imported M4A was copied into app storage, its original was removed, the library reopened, playback restored the saved position, and playback advanced successfully.
+- An actual MP4 containing AAC audio was imported, deduplicated, its original removed, and its saved copy successfully loaded after reopening the library.
+- Folder renaming preserves contents and positions, rejects conflicting names, and survives reopening. Swipe deletion returns recordings to Archive.
+- Press-and-drag from Archive into a folder passed, including persistence after terminating and reopening the app.
+- Tapping an archive item offers loading, renaming, marking listened/unlistened, moving, and deleting. Renaming and loading passed together with dragging. Listened status persists and older backups without that field still open.
+- Reset clears audio, errors, and the last-player selection without removing the archive or saved positions. Import audio appears above playback errors.
+- Interface tests use separate libraries so test folders and URLs do not enter the normal preview library.
+- Repeated file imports match SHA-256 content, including renamed files and older libraries without saved hashes; folder and position are retained. Distinct file contents remain separate.
+- Link matching handles fragments, host casing, default ports, Archive.org server aliases, and resolved page/direct-audio aliases. Meaningful query parameters remain distinct.
+- Disc, centered light icon, charms, silver scrubber, speaker mesh, compact controls, lowercase archive heading, and small rounded reset button were visually inspected. Latest screenshot: `Preview/earmark-ios-v3.png`; previous previews remain intact.
+- Files import picker opens and cancels correctly.
+- Folder and link persistence across app termination passed.
+- Theme choice persists across app termination.
+- Unsigned physical-iPhone build succeeded (`generic/platform=iOS`). Installing on a phone requires selecting a signing team in Xcode.
+- HTML entry points and every numbered preview match the hashes recorded before iOS work started.
+
+Result bundles for this machine: `/tmp/earmark-archive-final-tests.xcresult` (full run before the final gesture adjustment), `/tmp/earmark-archive-interaction-v2-tests.xcresult` (both archive interaction checks passed after the adjustment).
+
+Still requires a physical iPhone: lock-screen/background audio, Bluetooth/headphone route changes, phone-call interruptions, and receiving a document from another app through Open in Earmark. The document types and background-audio capability are configured; these device behaviors have not been claimed as tested.
+
+
+2026-10-25 sleep and archive update:
+- Added 5/15/30/45/60-minute sleep timers with cancellation and automatic pause. The playback test confirms expiration pauses an actual local audio asset.
+- Explicit Save link leaves the player unchanged. Pasted links still save immediately.
+- Player displays its current folder (Unarchived for ungrouped recordings).
+- Scrubs of at least 60 seconds retain a persisted return position. The intended destination saves before the asynchronous seek completes. Local-audio tests verify seeking, returning, small skips, and persistence.
+- Folder titles now expand/collapse contents; a separate ellipsis menu offers Rename. Disabled scrubbers no longer intercept scrolling.
+- Signed iPhone build and installation succeeded; existing archive was compared before and after installation and remained unchanged. A local backup is in backups/iphone-2026-10-25-before-sleep-timer.
+- First validation run: 16 unit checks and the Save link/sleep menu UI check passed (/tmp/earmark-sleep-save-tests.xcresult). The additional local-playback seek/sleep check passed in /tmp/earmark-seek-sleep-tests.xcresult; that run also exposed folder UI tests scrolling through the scrubber, which was addressed afterward.
+- Final folder checks passed (2/2) in /tmp/earmark-folder-sleep-v4-tests.xcresult, including tap-to-expand, separate rename menu, swipe deletion, dragging, and persistence. Save link and sleep-menu interaction also passed after the scrolling fix in /tmp/earmark-folder-sleep-v3-tests.xcresult.
+
+2026-10-26 global filters and rhinestone update:
+- Global Listening/Listened filters below folders show the folder beneath each title; expanded folders have independent filters backed by the same listened status. Filled checkmarks sit at the trailing edge.
+- Sleep is a small outlined text button offering 5, 15, or 30 minutes. Both jewel strips use 13 identical 13-point rhinestones with matching insets; the loose charms use faceted artwork with pale silver edges.
+- Approved disc C and dark-background icon preserve the original smooth disc colors, omit the decorative rim, and use smaller rhinestone charms. Native logo/icon assets were exported at 1024 square.
+- Renaming/loading and drag persistence passed in /tmp/earmark-global-tabs-fresh-tests.xcresult. Global/per-folder status changes passed in /tmp/earmark-global-status-final-tests.xcresult after waiting for filtered rows to disappear. Save-without-loading and sleep interaction passed in /tmp/earmark-global-tabs-tests.xcresult.
+- iPhone library was backed up under backups/iphone-2026-10-25-before-global-tabs and verified unchanged after the update.
+- Decorate is a separate interactive HTML mockup: previews/rhinestone-stereo-v12.html. Browser checks cover stereo-only drops, reusable sheet stickers, trash removal, Done persistence, reload, and mobile touch drag. This feature is not yet part of the native app.
+
+2026-10-26 header and typography preview:
+- Header uses locally bundled Modak (with its OFL license) as a rounded interpretation of the supplied reference. Registration and rendering were verified in the simulator, including the unchanged disc C.
+- Import audio is restored to a compact pink text-only control. Player and archive behavior are unchanged.
+- Signed iPhone and simulator builds passed. Three separate body-font mockups (Quicksand, Manrope, Varela Round) are available in previews/typography-v13.html; all fonts load locally, and the decorate panel still opens and saves. Body-font choices remain previews only.
+- Existing HTML and image previews were preserved. iPhone backup before this update: backups/iphone-2026-10-26-before-typography.
+
+2026-10-26 Quicksand selection and header studies:
+- Applied Quicksand to app content and stereo text buttons using the original variable font, with weights configured through the CoreText variation attribute. The green display block remains monospaced at its existing sizes and weights.
+- Skip arrows and numbers are grouped and centered inside their fixed circular controls. Native rendering was visually checked, and simulator/device builds passed.
+- Header alternatives in previews/header-options-v14.html keep these typography choices and offer three flatter reference-inspired treatments. These headers remain previews only; the installed header has not been replaced by an unselected option.
+- Previous HTML and screenshots remain intact. Before-update library backup: backups/iphone-2026-10-26-before-quicksand.
+
+
+2026-10-26 approved sticker studio release (supersedes earlier preview-only notes):
+- Applied header C with subtle spacing, the larger disc opening, inward heart placement, white gem borders, Quicksand content/buttons, and the muted inset green display. The LCD remains monospaced. Native screenshot: `Preview/earmark-ios-v4.png`.
+- Links save on load automatically; the separate Save link control and paste-only saving are removed. Renamed URLs and identical imported audio retain their original archive entry and show a duplicate notice. File actions retain drag-to-folder but omit Move.
+- The sleep control is neutral while off and pink while running; its countdown appears inside the LCD, including while paused. Menu cancellation and automatic expiration passed.
+- Significant scrubs retain a tappable horizontal return notch. Remaining time has no “left” label. The file-picker control is `add file` with its import icon.
+- Native decoration editing now supports 48 white-bordered gems, five per swipeable page, reusable sources, stereo-only placement, repositioning, trash removal, and atomic layout persistence. Native gesture tests cover pinch and rotation before releasing a source gem.
+- Full native run `/tmp/earmark-release-all-tests.xcresult`: 29 of 30 passed; the remaining source-page swipe exposed a direction-classification issue subsequently corrected and checked separately (see final result below).
+- Original standalone web player: 17 of 17 Node checks passed. New v17 HTML preview passed browser checks for five-item pages, header-only sheet text, automatic saving, renamed duplicate detection, and no JavaScript errors. Earlier previews remain intact.
+- Signed device build and installation succeeded. The before/after library comparison retained all entry IDs and folder data; the only changed entry field was playback position. Decorations use a separate JSON file. Device copies remain in ignored `backups/`.
+- Physical-device background audio, Bluetooth routing, interruptions, and receiving files from another app remain manual checks; installation alone does not establish these behaviors.
+- Final focused result: `/tmp/earmark-sticker-approved-tests.xcresult` passed both the native source-page swipe/drag/relaunch UI check and the pre-drop pinch/rotation check. Together with the full run, all 30 native checks passed after the paging correction.
