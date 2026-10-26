@@ -176,6 +176,7 @@ final class AudioPlayer: ObservableObject {
                     self.status = nil
                     let seconds = item.duration.seconds
                     self.duration = seconds.isFinite ? seconds : 0
+                    if let id = self.currentID { self.store.setDuration(self.duration, for: id) }
                     let target = self.duration > 0 ? min(resume, max(0, self.duration - 0.1)) : resume
                     self.player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] completed in
                         Task { @MainActor [weak self] in
@@ -270,7 +271,10 @@ final class AudioPlayer: ObservableObject {
         guard !restoring, currentID != nil else { return }
         let time = player.currentTime().seconds
         if time.isFinite { position = max(0, time) }
-        if let d = player.currentItem?.duration.seconds, d.isFinite { duration = d }
+        if let d = player.currentItem?.duration.seconds, d.isFinite {
+            duration = d
+            if let id = currentID { store.setDuration(d, for: id) }
+        }
         if abs(position - lastSaved) >= 5 { savePosition() }
         updateNowPlaying()
     }

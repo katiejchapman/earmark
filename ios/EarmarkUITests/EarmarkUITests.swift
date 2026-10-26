@@ -43,10 +43,17 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["saveArchive"].exists)
         XCTAssertEqual(app.buttons["loadLink"].label, "load")
+        XCTAssertEqual(app.textFields["linkField"].frame.midY, app.buttons["importAudio"].frame.midY, accuracy: 2)
+        XCTAssertLessThan(app.textFields["linkField"].frame.maxX, app.buttons["importAudio"].frame.midX)
+        XCTAssertLessThan(app.buttons["importAudio"].frame.midX, app.buttons["loadLink"].frame.midX)
+        XCTAssertLessThan(app.buttons["loadLink"].frame.midX, app.buttons["saveArchive"].frame.midX)
         XCTAssertEqual(app.buttons["loadLink"].frame.midY, app.buttons["importAudio"].frame.midY, accuracy: 2)
         XCTAssertEqual(app.buttons["loadLink"].frame.midY, app.buttons["saveArchive"].frame.midY, accuracy: 2)
         link.tap(); link.typeText("https://example.com/saved-only.mp3")
         app.buttons["loadLink"].tap()
+        let light = app.otherElements["loadedLight"]
+        let decorate = app.buttons["decorateStereo"]
+        if light.exists { XCTAssertEqual(light.frame.midY, decorate.frame.midY, accuracy: 3) }
         app.buttons["loadLink"].tap()
         XCTAssertTrue(app.staticTexts["duplicateNotice"].waitForExistence(timeout: 5))
         app.buttons["sleepTimer"].tap(); app.buttons["15 minutes"].tap()
@@ -74,6 +81,8 @@ final class EarmarkUITests: XCTestCase {
         let row = app.buttons["Options for archive-only, Unarchived"]
         for _ in 0..<3 where !row.isHittable { scrollArchive(app) }
         XCTAssertTrue(row.exists)
+        XCTAssertEqual(row.value as? String, "Not listened, 0% played")
+        let archiveShot = XCTAttachment(screenshot: app.screenshot()); archiveShot.name = "Listening archive progress"; archiveShot.lifetime = .keepAlways; add(archiveShot)
         row.tap(); app.buttons["Delete"].tap()
         XCTAssertTrue(row.waitForNonExistence(timeout: 5))
         app.buttons["undoDelete"].tap()

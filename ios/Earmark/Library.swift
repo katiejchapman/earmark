@@ -12,6 +12,11 @@ struct Recording: Identifiable, Codable, Equatable {
     var manualNames = false
     var manualFolder = false
     var position: Double = 0
+    var duration: Double?
+    var progressFraction: Double? {
+        guard let duration, duration.isFinite, duration > 0 else { return position == 0 ? 0 : nil }
+        return min(1, max(0, position / duration))
+    }
     var isFeed = false
     var localFilename: String?
     var contentHash: String?
@@ -260,6 +265,11 @@ final class LibraryStore: ObservableObject {
     }
 
     func select(_ id: UUID?) { data.lastID = id; save() }
+    func setDuration(_ duration: Double, for id: UUID) {
+        guard duration.isFinite, duration > 0, let entry = entry(id),
+              entry.duration == nil || abs((entry.duration ?? 0) - duration) >= 0.5 else { return }
+        update(id) { $0.duration = duration }
+    }
     func setPosition(_ position: Double, for id: UUID) {
         guard position.isFinite, position >= 0 else { return }
         update(id) { $0.position = position }
@@ -277,7 +287,7 @@ final class LibraryStore: ObservableObject {
         var incoming = try JSONDecoder().decode(LibraryData.self, from: bytes)
         guard incoming.version == 1,
               Set(incoming.entries.map(\.id)).count == incoming.entries.count,
-              incoming.entries.allSatisfy({ ($0.localFilename == nil || Self.validLocalName($0.localFilename)) && (Self.webURL($0.url.absoluteString) != nil || Self.validLocalName($0.localFilename)) && ($0.source == nil || Self.webURL($0.source!.absoluteString) != nil) && $0.position.isFinite && $0.position >= 0 && ($0.scrubReturnPosition == nil || ($0.scrubReturnPosition!.isFinite && $0.scrubReturnPosition! >= 0)) }) else { throw LibraryError.unsupported }
+              incoming.entries.allSatisfy({ ($0.localFilename == nil || Self.validLocalName($0.localFilename)) && (Self.webURL($0.url.absoluteString) != nil || Self.validLocalName($0.localFilename)) && ($0.source == nil || Self.webURL($0.source!.absoluteString) != nil) && ($0.duration == nil || ($0.duration!.isFinite && $0.duration! > 0)) && $0.position.isFinite && $0.position >= 0 && ($0.scrubReturnPosition == nil || ($0.scrubReturnPosition!.isFinite && $0.scrubReturnPosition! >= 0)) }) else { throw LibraryError.unsupported }
         incoming.folders = Array(Set(incoming.folders)).sorted()
         for i in incoming.entries.indices where !incoming.folders.contains(incoming.entries[i].folder ?? "") {
             incoming.entries[i].folder = nil

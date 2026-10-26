@@ -56,7 +56,7 @@ struct ContentView: View {
     @State private var dragLocation = CGPoint.zero
     @State private var linkFocused = false
 
-    private var paper: Color { dark ? Color(red: 0.10, green: 0.09, blue: 0.12) : Color(red: 0.94, green: 0.91, blue: 0.89) }
+    private var paper: Color { dark ? Color(red: 0.10, green: 0.09, blue: 0.12) : Color(hex: 0xd8ceca) }
     private var card: Color { dark ? Color(red: 0.16, green: 0.14, blue: 0.18) : Color(red: 0.98, green: 0.96, blue: 0.94) }
     private var metal: [Color] { dark ? [Color(hex: 0x777880), Color(hex: 0x42454d), Color(hex: 0x686b73), Color(hex: 0x34373d)] : [Color(hex: 0xf2f3ee), Color(hex: 0xbfc4bd), Color(hex: 0xe4e6df), Color(hex: 0xa5aca5)] }
 
@@ -209,19 +209,21 @@ struct ContentView: View {
 
     private var linkField: some View {
         VStack(alignment: .leading, spacing: 9) {
-            LinkInput(text: $link, focused: Binding(get: { linkFocused }, set: { linkFocused = $0 }), onSubmit: loadLink) { _ in }
-                .padding(.horizontal, 12).padding(.vertical, 7)
-                .frame(height: 36).background(card, in: RoundedRectangle(cornerRadius: 10))
-            HStack(spacing: 12) {
-                Button("load", action: loadLink).font(AppType.font(.subheadline, weight: 600))
-                    .padding(.horizontal, 17).frame(height: 32)
-                    .background(rose, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(Color.black.opacity(0.8))
-                    .frame(minHeight: 44).accessibilityIdentifier("loadLink")
+            HStack(spacing: 6) {
+                LinkInput(text: $link, focused: Binding(get: { linkFocused }, set: { linkFocused = $0 }), onSubmit: loadLink) { _ in }
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .frame(minWidth: 60, maxWidth: .infinity).frame(height: 34)
+                    .background(card, in: RoundedRectangle(cornerRadius: 11))
                 Button { archiveOnlyImport = player.currentID != nil; importingAudio = true; importing = true } label: {
                     HStack(spacing: 3) { Image(systemName: "folder.badge.plus"); Text("add file") }
-                        .font(AppType.font(.caption1)).frame(minHeight: 44)
-                }.accessibilityIdentifier("importAudio")
-                Spacer(minLength: 0)
+                        .font(AppType.fixed(11, weight: 600)).frame(width: 66, height: 32)
+                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(rose.opacity(0.65)))
+                        .frame(height: 44)
+                }.buttonStyle(.plain).accessibilityIdentifier("importAudio")
+                Button("load", action: loadLink).font(AppType.fixed(11, weight: 600))
+                    .frame(width: 44, height: 32)
+                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(rose.opacity(0.65)))
+                    .frame(height: 44).buttonStyle(.plain).accessibilityIdentifier("loadLink")
                 Menu {
                     Button("Save link to archive", systemImage: "link") { saveLink() }
                         .accessibilityIdentifier("archiveLink")
@@ -229,9 +231,11 @@ struct ContentView: View {
                         archiveOnlyImport = true; importingAudio = true; importing = true
                     }.accessibilityIdentifier("archiveFile")
                 } label: {
-                    HStack(spacing: 4) { Image(systemName: "tray.and.arrow.down"); Text("save") }
-                        .font(AppType.font(.caption1)).frame(minHeight: 44)
-                }.accessibilityLabel("Save to archive").accessibilityIdentifier("saveArchive")
+                    Image(systemName: "tray.and.arrow.down").font(.system(size: 15))
+                        .frame(width: 34, height: 32)
+                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(rose.opacity(0.65)))
+                        .frame(height: 44)
+                }.buttonStyle(.borderless).accessibilityLabel("Save to archive").accessibilityIdentifier("saveArchive")
             }
             if let duplicate = store.duplicateNotice {
                 Text(duplicate).font(AppType.font(.caption1)).foregroundStyle(rose).accessibilityIdentifier("duplicateNotice")
@@ -293,22 +297,15 @@ struct ContentView: View {
                     Spacer()
                     Button { remaining.toggle() } label: {
                         Text(remaining ? "−\(Self.time(max(0, player.duration - (scrub ?? player.position))))" : Self.time(player.duration))
-                            .frame(minHeight: 32)
+                            .frame(minHeight: 24)
                     }.buttonStyle(.plain).accessibilityLabel(remaining ? "Show total time" : "Show time remaining")
                 }.font(AppType.fixed(12)).monospacedDigit()
                     .protectedStereo("time")
-                controls.protectedStereo("playback")
+                controls.padding(.top, -3).protectedStereo("playback")
             }
             Color.clear.frame(height: 26)
             HStack {
                 SleepControl(player: player, active: player.sleepDeadline != nil, dark: dark).equatable().protectedStereo("sleep")
-                Spacer()
-                Button { studio.editing ? studio.finish() : studio.begin() } label: {
-                    StickerSheetIcon().frame(width: 20, height: 21)
-                        .padding(.horizontal, 9).frame(height: 26)
-                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
-                        .frame(minHeight: 44)
-                }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityLabel("Decorate stereo").accessibilityIdentifier("decorateStereo").protectedStereo("decorate")
                 Spacer()
             Button {
                 store.duplicateNotice = nil
@@ -321,19 +318,26 @@ struct ContentView: View {
             }
             .buttonStyle(.plain).accessibilityIdentifier("resetPlayer").protectedStereo("reset")
             }
-            Speaker(dark: dark).frame(height: 22).padding(.horizontal, 7).padding(.top, 6)
-                .protectedStereo("mesh").accessibilityHidden(true)
-            HStack {
-                if player.currentID != nil {
-                    Circle().fill(RadialGradient(colors: [Color(hex: 0xffd5cf), Color(hex: 0xff243d), Color(hex: 0x9a0020)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 7))
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1))
-                        .shadow(color: .red.opacity(0.85), radius: 5)
-                        .accessibilityLabel("Audio loaded").accessibilityIdentifier("loadedLight")
-                        .protectedStereo("light")
-                }
-                Spacer()
-            }.frame(height: 10).padding(.leading, -5).padding(.bottom, -6)
+            HStack(spacing: 10) {
+                Group {
+                    if player.currentID != nil {
+                        Circle().fill(RadialGradient(colors: [Color(hex: 0xffd5cf), Color(hex: 0xff243d), Color(hex: 0x9a0020)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 7))
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1))
+                            .shadow(color: .red.opacity(0.85), radius: 5)
+                            .accessibilityLabel("Audio loaded").accessibilityIdentifier("loadedLight")
+                    } else { Color.clear.frame(width: 10, height: 10).accessibilityHidden(true) }
+                }.frame(width: 28, height: 44).protectedStereo("light")
+                Speaker(dark: dark).frame(height: 22)
+                    .protectedStereo("mesh").accessibilityIdentifier("speakerMesh").accessibilityHidden(true)
+                Button { studio.editing ? studio.finish() : studio.begin() } label: {
+                    StickerSheetIcon().frame(width: 23, height: 23)
+                        .frame(width: 38, height: 30)
+                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color(hex: dark ? 0xaaa3ac : 0x777e75)))
+                        .frame(height: 44)
+                }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityLabel("Decorate stereo")
+                    .accessibilityIdentifier("decorateStereo").protectedStereo("decorate")
+            }
 
         }
         .padding(20)
@@ -483,7 +487,9 @@ struct ContentView: View {
         }
     }
     private func archiveRow(_ entry: Recording, showFolder: Bool = false) -> some View {
-        VStack(spacing: 0) {
+        let progress = entry.id == player.currentID && player.duration > 0 ? min(1, max(0, player.position / player.duration)) : entry.progressFraction
+        let percent = progress.map { "\(Int(($0 * 100).rounded(.down)))%" } ?? "—%"
+        return VStack(spacing: 0) {
             Divider().padding(.bottom, 10)
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -491,6 +497,13 @@ struct ContentView: View {
                         .foregroundStyle(entry.listened == true ? Color(hex: dark ? 0x9fc8c2 : 0x49796f) : .primary)
                     Text(showFolder ? (entry.folder ?? "Unarchived") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
                          .font(AppType.font(.caption1)).foregroundStyle(.secondary)
+                    if entry.listened != true && !entry.isFeed {
+                        HStack(spacing: 8) {
+                            ProgressView(value: progress ?? 0).tint(rose).frame(maxWidth: .infinity)
+                            Text(percent).font(AppType.fixed(10, weight: 600)).monospacedDigit()
+                                .foregroundStyle(.secondary).frame(minWidth: 29, alignment: .trailing)
+                        }.padding(.top, 2).accessibilityHidden(true)
+                    }
                 }
                 Spacer(minLength: 0)
                 if entry.listened == true {
@@ -505,7 +518,7 @@ struct ContentView: View {
         .accessibilityElement(children: .ignore).accessibilityAddTraits(.isButton)
         .accessibilityAction { archiveActions = entry }
         .accessibilityLabel(showFolder ? "Options for \(entry.title), \(entry.folder ?? "Unarchived")" : "Options for \(entry.title)")
-        .accessibilityValue(entry.listened == true ? "Listened" : "Not listened")
+        .accessibilityValue(entry.listened == true ? "Listened" : (entry.isFeed ? "Not listened" : "Not listened, \(percent) played"))
         .accessibilityIdentifier("\(showFolder ? "globalArchiveEntry" : "archiveEntry")-\(entry.id)")
         .opacity(draggingID == entry.id ? 0.4 : 1)
         .highPriorityGesture(archiveDrag(entry).simultaneously(with: TapGesture().onEnded { archiveActions = entry }))
@@ -572,7 +585,7 @@ private struct LinkInput: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> Field {
         let field = Field()
-        field.placeholder = "Paste an audio or podcast link"
+        field.placeholder = "link"
         field.accessibilityIdentifier = "linkField"
         field.font = AppType.uiFont(.subheadline)
         field.adjustsFontForContentSizeCategory = true
@@ -653,7 +666,7 @@ private struct SilverScrubber: View {
                     .shadow(color: .black.opacity(0.2), radius: 1, y: 2)
                     .frame(width: 16, height: 16).offset(x: width * fraction)
             }
-            .frame(height: 32).contentShape(Rectangle())
+            .frame(height: 24).contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { gesture in
                 guard enabled else { return }
                 if let saved = savedPosition, abs(gesture.startLocation.x - (8 + width * saved / max(1, duration))) < 12,
@@ -666,7 +679,7 @@ private struct SilverScrubber: View {
                 else { onEnd() }
             })
         }
-        .frame(height: 32)
+        .frame(height: 24)
         .allowsHitTesting(enabled)
         .accessibilityElement().accessibilityLabel("Playback position")
         .accessibilityValue("\(ContentView.time(value)) of \(ContentView.time(duration))")

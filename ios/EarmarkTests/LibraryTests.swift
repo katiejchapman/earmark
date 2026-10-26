@@ -6,6 +6,29 @@ import UIKit
 final class LibraryTests: XCTestCase {
     private func temporaryFile() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("library.json") }
 
+    @MainActor func testArchiveProgressPersistsAndOldLibrariesRemainReadable() throws {
+        let file = temporaryFile(); let store = LibraryStore(file: file)
+        let entry = try store.remember("https://example.com/progress.mp3")
+        XCTAssertEqual(entry.progressFraction, 0)
+        store.setPosition(80, for: entry.id)
+        XCTAssertNil(store.entry(entry.id)?.progressFraction)
+        store.setDuration(200, for: entry.id)
+        let reopened = LibraryStore(file: file)
+        XCTAssertEqual(reopened.entry(entry.id)?.duration, 200)
+        XCTAssertEqual(reopened.entry(entry.id)?.progressFraction ?? -1, 0.4, accuracy: 0.001)
+        reopened.setPosition(300, for: entry.id)
+        XCTAssertEqual(reopened.entry(entry.id)?.progressFraction, 1)
+        reopened.setDuration(-1, for: entry.id)
+        XCTAssertEqual(reopened.entry(entry.id)?.duration, 200)
+        var legacy = try JSONDecoder().decode(LibraryData.self, from: reopened.exportData())
+        legacy.entries[0].duration = nil
+        try reopened.restore(JSONEncoder().encode(legacy))
+        XCTAssertEqual(reopened.entry(entry.id)?.position, 300)
+        XCTAssertNil(reopened.entry(entry.id)?.duration)
+        legacy.entries[0].duration = -20
+        XCTAssertThrowsError(try reopened.restore(JSONEncoder().encode(legacy)))
+    }
+
     @MainActor func testSelectionPersistsBeforeAudioResolution() throws {
         let file = temporaryFile(); let store = LibraryStore(file: file)
         let first = try store.remember("https://example.com/old.mp3")
@@ -502,6 +525,8 @@ final class LibraryTests: XCTestCase {
         XCTAssertFalse(player.loading)
         XCTAssertNil(player.message)
         XCTAssertGreaterThan(player.duration, 3.9)
+        XCTAssertGreaterThan(reopened.entry(entry.id)?.duration ?? 0, 3.9)
+        XCTAssertEqual(reopened.entry(entry.id)?.progressFraction ?? -1, 1.25 / player.duration, accuracy: 0.02)
         XCTAssertEqual(player.position, 1.25, accuracy: 0.15)
         player.play()
         try await Task.sleep(nanoseconds: 1_500_000_000)
