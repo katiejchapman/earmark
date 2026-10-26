@@ -56,6 +56,7 @@ struct ContentView: View {
     @State private var draggingID: UUID?
     @State private var dragLocation = CGPoint.zero
     @State private var linkFocused = false
+    @State private var widgetSleepOptions = false
 
     private var paper: Color { dark ? Color(red: 0.10, green: 0.09, blue: 0.12) : Color(hex: 0xd8ceca) }
     private var card: Color { dark ? Color(red: 0.16, green: 0.14, blue: 0.18) : Color(red: 0.98, green: 0.96, blue: 0.94) }
@@ -105,7 +106,7 @@ struct ContentView: View {
         .tint(rose)
         .font(AppType.font(.body))
         .sheet(item: $editing) { entry in
-            NameEditor(entry: entry) { title, folder in
+            NameEditor(entry: entry, folders: store.data.folders) { title, folder in
                 store.rename(entry.id, title: title, show: entry.show)
                 store.move(entry.id, to: store.addFolder(folder))
                 player.updateNowPlaying()
@@ -147,6 +148,14 @@ struct ContentView: View {
         .onDisappear { clearStagedAudio() }
         .onChange(of: sourceIsFile) { _, isFile in if !isFile { clearStagedAudio() } }
         .onOpenURL { url in
+            if url.scheme == "earmark", url.host == "widget" {
+                switch url.lastPathComponent {
+                case "decorate": studio.begin()
+                case "sleep": widgetSleepOptions = true
+                default: player.handleWidgetAction(url.lastPathComponent)
+                }
+                return
+            }
             guard url.isFileURL else { return }
             do { player.load(try store.importAudio(url)) }
             catch { notice = "Couldn’t import audio: \(error.localizedDescription)" }
@@ -171,6 +180,12 @@ struct ContentView: View {
                     Button("undo") { store.undoDelete() }.accessibilityIdentifier("undoDelete")
                 }.padding(14).background(.regularMaterial)
             }
+        }
+        .confirmationDialog("Sleep timer", isPresented: $widgetSleepOptions) {
+            ForEach([5, 15, 30], id: \.self) { minutes in
+                Button("\(minutes) minutes") { player.setSleepTimer(seconds: Double(minutes * 60)) }
+            }
+            if player.sleepActive { Button("Cancel", role: .destructive) { player.cancelSleepTimer() } }
         }
         .alert("New folder", isPresented: $creatingFolder) {
             TextField("Folder name", text: $folder).accessibilityIdentifier("folderName")
@@ -287,7 +302,7 @@ struct ContentView: View {
                     .accessibilityIdentifier("nowPlayingTitle")
                 if let current = player.current {
                     HStack(alignment: .firstTextBaseline) {
-                        Text(current.folder ?? "Unarchived")
+                        Text(current.folder ?? "inbox")
                             .font(.system(size: 11, design: .monospaced))
                             .accessibilityIdentifier("nowPlayingFolder")
                         Spacer(minLength: 8)
@@ -326,7 +341,7 @@ struct ContentView: View {
                 }.font(AppType.fixed(12)).monospacedDigit()
                     .protectedStereo("time")
                 HStack(spacing: 4) {
-                    SleepControl(player: player, active: player.sleepDeadline != nil, dark: dark).equatable().protectedStereo("sleep")
+                    SleepControl(player: player, active: player.sleepActive, dark: dark).equatable().protectedStereo("sleep")
                     Spacer(minLength: 0)
                     controls.protectedStereo("playback")
                     Spacer(minLength: 0)
@@ -401,7 +416,7 @@ struct ContentView: View {
         }.frame(height: 44).buttonStyle(.plain).accessibilityLabel(label).disabled(player.currentID == nil)
     }
     @ViewBuilder private var sleepCountdown: some View {
-        if player.sleepDeadline != nil {
+        if player.sleepActive {
             Text("sleep \(Self.time(ceil(player.sleepRemaining)))").font(.system(size: 10, design: .monospaced)).monospacedDigit()
                 .fixedSize().accessibilityIdentifier("sleepCountdown")
         }
@@ -439,7 +454,7 @@ struct ContentView: View {
     @ViewBuilder private func folderView(_ folder: String?) -> some View {
         let entries = store.data.entries.filter { $0.folder == folder }
         let key = folder ?? ""
-        let title = "\(folder ?? "Unarchived") · \(entries.count)"
+        let title = "\(folder ?? "inbox") · \(entries.count)"
         if folder != nil || !entries.isEmpty {
             HStack(spacing: 8) {
                 Button { toggleFolder(key) } label: {
@@ -458,7 +473,7 @@ struct ContentView: View {
                 Button { toggleFolder(key) } label: {
                     Image(systemName: expandedFolders.contains(key) ? "chevron.down" : "chevron.right")
                         .frame(width: 44, height: 44)
-                }.accessibilityLabel("\(expandedFolders.contains(key) ? "Collapse" : "Expand") \(folder ?? "Unarchived")")
+                }.accessibilityLabel("\(expandedFolders.contains(key) ? "Collapse" : "Expand") \(folder ?? "inbox")")
             }
             .font(AppType.font(.subheadline, weight: 600)).foregroundStyle(.primary)
             .buttonStyle(.plain)
@@ -532,7 +547,7 @@ struct ContentView: View {
                             }.accessibilityHidden(true)
                         }
                     }
-                    Text(showFolder ? (entry.folder ?? "Unarchived") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
+                    Text(showFolder ? (entry.folder ?? "inbox") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
                         .font(AppType.font(.caption1)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
@@ -547,7 +562,7 @@ struct ContentView: View {
         .contentShape(Rectangle()).foregroundStyle(.primary)
         .accessibilityElement(children: .ignore).accessibilityAddTraits(.isButton)
         .accessibilityAction { archiveActions = entry }
-        .accessibilityLabel(showFolder ? "Options for \(entry.title), \(entry.folder ?? "Unarchived")" : "Options for \(entry.title)")
+        .accessibilityLabel(showFolder ? "Options for \(entry.title), \(entry.folder ?? "inbox")" : "Options for \(entry.title)")
         .accessibilityValue(entry.listened == true ? "Listened" : (entry.isFeed ? "Not listened" : "Not listened, \(percent) played"))
         .accessibilityIdentifier("\(showFolder ? "globalArchiveEntry" : "archiveEntry")-\(entry.id)")
         .opacity(draggingID == entry.id ? 0.4 : 1)
@@ -651,7 +666,7 @@ private struct SleepControl: View, Equatable {
                 Button("\(minutes) minutes") { player.setSleepTimer(seconds: Double(minutes * 60)) }
             }
             if active {
-                Button("Cancel sleep timer", role: .destructive) { player.cancelSleepTimer() }.buttonStyle(.automatic)
+                Button("Cancel", role: .destructive) { player.cancelSleepTimer() }.buttonStyle(.automatic)
             }
         } label: {
             Text("sleep").font(AppType.fixed(10)).frame(width: 50, height: 26)
@@ -757,20 +772,84 @@ private struct Speaker: View {
     }
 }
 
+private struct ClearableNameInput: UIViewRepresentable {
+    @Binding var text: String
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.placeholder = "Episode or audio title"
+        field.accessibilityIdentifier = "renameTitle"
+        field.font = AppType.uiFont(.body)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
+        let clear = UIButton(type: .system)
+        clear.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        clear.tintColor = .secondaryLabel
+        clear.frame = CGRect(x: 0, y: 0, width: 44, height: 44)
+        clear.accessibilityLabel = "Clear name"; clear.accessibilityIdentifier = "clearRenameTitle"
+        clear.addTarget(context.coordinator, action: #selector(Coordinator.clear), for: .touchUpInside)
+        field.rightView = clear; field.rightViewMode = .always
+        context.coordinator.field = field
+        return field
+    }
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.text = $text
+        if field.text != text { field.text = text }
+        field.rightView?.isHidden = text.isEmpty
+    }
+    final class Coordinator: NSObject {
+        var text: Binding<String>
+        weak var field: UITextField?
+        init(text: Binding<String>) { self.text = text }
+        @objc func changed(_ field: UITextField) { text.wrappedValue = field.text ?? "" }
+        @objc func clear() { field?.text = ""; text.wrappedValue = ""; field?.becomeFirstResponder() }
+    }
+}
+
 private struct NameEditor: View {
     @Environment(\.dismiss) var dismiss
     @State private var title: String
     @State private var folder: String
+    @State private var makingFolder = false
+    @State private var newFolder = ""
+    let folders: [String]
     let save: (String, String) -> Void
-    init(entry: Recording, save: @escaping (String, String) -> Void) { _title = State(initialValue: entry.title); _folder = State(initialValue: entry.folder ?? ""); self.save = save }
+    init(entry: Recording, folders: [String], save: @escaping (String, String) -> Void) {
+        _title = State(initialValue: entry.title)
+        _folder = State(initialValue: entry.folder ?? "")
+        self.folders = folders; self.save = save
+    }
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Episode or audio title", text: $title)
-                TextField("Folder name (optional)", text: $folder)
-            }.navigationTitle("Rename").toolbar {
+                ClearableNameInput(text: $title).frame(height: 44)
+                Menu {
+                    Button("inbox") { folder = "" }.accessibilityIdentifier("chooseFolder-unarchived")
+                    ForEach(folders, id: \.self) { name in
+                        Button(name) { folder = name }.accessibilityIdentifier("chooseFolder-\(name)")
+                    }
+                    if !folder.isEmpty && !folders.contains(folder) {
+                        Button(folder) { }
+                    }
+                    Divider()
+                    Button("New folder…", systemImage: "plus") { newFolder = ""; makingFolder = true }
+                        .accessibilityIdentifier("renameNewFolder")
+                } label: {
+                    HStack {
+                        Text("Folder"); Spacer()
+                        Text(folder.isEmpty ? "inbox" : folder).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption).foregroundStyle(.secondary)
+                    }
+                }.accessibilityIdentifier("renameFolderPicker")
+            }.tint(rose).navigationTitle("Rename").toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save(title, folder); dismiss() }.disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+            }
+            .alert("New folder", isPresented: $makingFolder) {
+                TextField("Folder name", text: $newFolder).accessibilityIdentifier("renameNewFolderName")
+                Button("Create") { folder = newFolder.trimmingCharacters(in: .whitespacesAndNewlines); newFolder = folder }
+                    .disabled(newFolder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button("Cancel", role: .cancel) { }
             }
         }
     }

@@ -41,28 +41,41 @@ final class AudioPlayer: ObservableObject {
     }
     private var sleepTask: Task<Void, Never>?
 
+    var sleepActive: Bool { sleepRemaining > 0 }
+
     func setSleepTimer(seconds: Double) {
         cancelSleepTimer()
         guard seconds.isFinite, seconds > 0, seconds <= 86_400 else { return }
-        sleepDeadline = Date().addingTimeInterval(seconds)
         sleepRemaining = seconds
+        syncSleepCountdown()
+        publishWidget()
+    }
+    private func pauseSleepCountdown() {
+        if let deadline = sleepDeadline { sleepRemaining = max(0, deadline.timeIntervalSinceNow) }
+        sleepDeadline = nil
+        sleepTask?.cancel(); sleepTask = nil
+    }
+    private func syncSleepCountdown() {
+        guard playing, wantsPlayback else { pauseSleepCountdown(); return }
+        guard sleepActive, sleepDeadline == nil else { return }
+        sleepDeadline = Date().addingTimeInterval(sleepRemaining)
         sleepTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let deadline = self?.sleepDeadline else { return }
+                guard let self, let deadline = self.sleepDeadline else { return }
+                guard self.playing, self.wantsPlayback else { self.pauseSleepCountdown(); self.publishWidget(); return }
                 let remaining = max(0, deadline.timeIntervalSinceNow)
-                self?.sleepRemaining = remaining
-                if remaining <= 0 { self?.expireSleepTimer(); return }
+                self.sleepRemaining = remaining
+                if remaining <= 0 { self.expireSleepTimer(); return }
                 do { try await Task.sleep(for: .seconds(min(1, remaining))) }
                 catch { return }
             }
         }
     }
-
     func cancelSleepTimer() {
-        sleepTask?.cancel(); sleepTask = nil
-        sleepDeadline = nil; sleepRemaining = 0
+        pauseSleepCountdown()
+        sleepRemaining = 0
+        publishWidget()
     }
-
     private func expireSleepTimer() {
         pause()
         cancelSleepTimer()
@@ -77,6 +90,7 @@ final class AudioPlayer: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.playing = isPlaying
+                self.syncSleepCountdown()
                 if !self.restoring { self.loading = waiting }
                 self.updateNowPlaying()
             }
@@ -87,7 +101,7 @@ final class AudioPlayer: ObservableObject {
         notifications.append(NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { [weak self] event in
             Task { @MainActor [weak self] in
                 guard let self, event.object as? AVPlayerItem === self.player.currentItem else { return }
-                self.wantsPlayback = false; self.playing = false
+                self.wantsPlayback = false; self.playing = false; self.syncSleepCountdown()
                 if let id = self.currentID { self.store.setPosition(0, for: id) }
                 self.updateNowPlaying()
             }
@@ -119,12 +133,14 @@ final class AudioPlayer: ObservableObject {
     func restoreLast() { if currentID == nil, let entry = store.entry(store.data.lastID) { load(entry, autoplay: false) } }
 
     func load(_ entry: Recording, autoplay: Bool = false, refresh: Bool = false) {
+        pauseSleepCountdown()
         clearScrubReturn()
         savePosition(); player.pause(); loadTask?.cancel()
         status = nil; player.replaceCurrentItem(with: nil)
         generation = UUID(); let token = generation
         currentID = entry.id; store.select(entry.id)
         source = nil; position = entry.position; duration = 0
+        pendingWidgetSkip = nil
         wantsPlayback = autoplay; loading = true; restoring = true; playing = false; message = nil; lastSaved = -1
         loadTask = Task {
             do {
@@ -184,6 +200,7 @@ final class AudioPlayer: ObservableObject {
                             self.restoring = false; self.loading = false
                             if completed { self.position = target }
                             else { self.message = "error" }
+                            if let offset = self.pendingWidgetSkip { self.pendingWidgetSkip = nil; self.skip(offset) }
                             if self.wantsPlayback { self.play() }
                             self.updateNowPlaying()
                         }
@@ -211,14 +228,16 @@ final class AudioPlayer: ObservableObject {
             player.play()
         } catch { wantsPlayback = false; message = "error" }
     }
-    func pause() { wantsPlayback = false; player.pause(); savePosition(); updateNowPlaying() }
+    func pause() { wantsPlayback = false; pauseSleepCountdown(); player.pause(); savePosition(); updateNowPlaying() }
     func stop() {
         clearScrubReturn()
         cancelSleepTimer()
         savePosition(); loadTask?.cancel(); generation = UUID(); status = nil
         player.pause(); player.replaceCurrentItem(with: nil)
         currentID = nil; position = 0; duration = 0; playing = false; loading = false; restoring = false; wantsPlayback = false
+        pendingWidgetSkip = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        publishWidget()
     }
     func reset() {
         stop()
@@ -278,7 +297,27 @@ final class AudioPlayer: ObservableObject {
         if abs(position - lastSaved) >= 5 { savePosition() }
         updateNowPlaying()
     }
+    func handleWidgetAction(_ action: String) {
+        switch action {
+        case "toggle": restoreLast(); toggle()
+        case "back", "forward":
+            restoreLast()
+            let offset: Double = action == "back" ? -15 : 15
+            if loading { pendingWidgetSkip = offset }
+            else { skip(offset) }
+        case "reset": reset()
+        default: restoreLast()
+        }
+    }
+    private var pendingWidgetSkip: Double?
+    var widgetDecorations: (() -> WidgetDecorations)?
+    func publishWidget() {
+        WidgetBridge.publish(WidgetSnapshot(title: current?.title ?? "earmark", folder: current.map { $0.folder ?? "inbox" } ?? "",
+            position: position, duration: duration > 0 ? duration : (current?.duration ?? 0), playing: playing, loaded: currentID != nil,
+            dark: UserDefaults.standard.object(forKey: "darkMode") as? Bool ?? true, updated: Date(), sleepDeadline: sleepDeadline, sleepRemaining: sleepRemaining, decorations: widgetDecorations?() ?? .empty))
+    }
     func updateNowPlaying() {
+        publishWidget()
         guard let entry = current else { return }
         var info: [String: Any] = [MPMediaItemPropertyTitle: entry.title,
                                   MPMediaItemPropertyArtist: entry.show,

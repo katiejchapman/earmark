@@ -27,7 +27,7 @@ final class EarmarkUITests: XCTestCase {
         let globalTab = app.buttons["status-listened-global"]
         for _ in 0..<3 where !globalTab.isHittable { scrollArchive(app) }
         globalTab.tap()
-        let global = app.buttons["Options for status-only, Unarchived"]
+        let global = app.buttons["Options for status-only, inbox"]
         XCTAssertTrue(global.waitForExistence(timeout: 5))
         global.tap(); app.buttons["Mark as unlistened"].tap()
         XCTAssertTrue(global.waitForNonExistence(timeout: 5))
@@ -64,12 +64,12 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["sleepCountdown"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["sleepTimer"].label.contains(":"))
         let active = XCTAttachment(screenshot: app.screenshot()); active.name = "Loaded stereo with sleep countdown"; active.lifetime = .keepAlways; add(active)
-        app.buttons["sleepTimer"].tap(); app.buttons["Cancel sleep timer"].tap()
+        app.buttons["sleepTimer"].tap(); app.buttons["Cancel"].tap()
         XCTAssertTrue(app.staticTexts["sleepCountdown"].waitForNonExistence(timeout: 5))
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = "Sleep timer cancelled"; screenshot.lifetime = .keepAlways; add(screenshot)
         app.buttons["sleepTimer"].tap()
-        XCTAssertFalse(app.buttons["Cancel sleep timer"].exists)
+        XCTAssertFalse(app.buttons["Cancel"].exists)
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.2)).tap()
     }
 
@@ -82,7 +82,7 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "A little listening time")
         XCTAssertFalse(app.otherElements["loadedLight"].exists)
         scrollArchive(app)
-        let row = app.buttons["Options for archive-only, Unarchived"]
+        let row = app.buttons["Options for archive-only, inbox"]
         for _ in 0..<3 where !row.isHittable { scrollArchive(app) }
         XCTAssertTrue(row.exists)
         XCTAssertEqual(row.value as? String, "Not listened, 0% played")
@@ -153,7 +153,7 @@ final class EarmarkUITests: XCTestCase {
         let field = app.alerts["New folder"].textFields.firstMatch
         field.tap(); field.typeText("Listening")
         app.alerts["New folder"].buttons["Create"].tap()
-        app.buttons["Expand Unarchived"].tap()
+        app.buttons["Expand inbox"].tap()
         let item = app.buttons["Options for \(title)"]
         scrollArchive(app)
         item.press(forDuration: 1, thenDragTo: app.buttons["folderMenu-Listening"], withVelocity: .slow, thenHoldForDuration: 1)
@@ -172,7 +172,7 @@ final class EarmarkUITests: XCTestCase {
         app.buttons["loadLink"].tap()
         XCTAssertTrue(app.staticTexts["error"].waitForExistence(timeout: 15))
         scrollArchive(app)
-        app.buttons["Expand Unarchived"].tap()
+        app.buttons["Expand inbox"].tap()
         let item = app.buttons["Options for \(title)"]
         for _ in 0..<3 where !item.isHittable { scrollArchive(app) }
         item.tap()
@@ -193,6 +193,52 @@ final class EarmarkUITests: XCTestCase {
         app.swipeDown(); app.swipeDown()
         XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "Renamed audio")
     }
+    @MainActor func testRenameClearsNameAndChoosesExistingOrNewFolder() {
+        let app = testApp(); app.launch()
+        let link = app.textFields["linkField"]
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap(); link.typeText("https://example.com/rename-options.mp3")
+        app.buttons["saveArchive"].tap(); scrollArchive(app)
+        app.buttons["Create folder"].tap()
+        app.alerts["New folder"].textFields.firstMatch.typeText("Existing")
+        app.alerts["New folder"].buttons["Create"].tap()
+        let original = app.buttons["Options for rename-options, inbox"]
+        for _ in 0..<3 where !original.isHittable { scrollArchive(app) }
+        original.tap(); app.buttons["Rename"].tap()
+        let field = app.textFields["renameTitle"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        app.buttons["clearRenameTitle"].firstMatch.tap()
+        XCTAssertEqual(field.value as? String, "Episode or audio title")
+        XCTAssertFalse(app.buttons["Save"].isEnabled)
+        field.tap(); field.typeText("Chosen name")
+        app.buttons["renameFolderPicker"].tap(); app.buttons["chooseFolder-Existing"].tap()
+        app.buttons["Save"].tap()
+        let existing = app.buttons["Options for Chosen name, Existing"]
+        XCTAssertTrue(existing.waitForExistence(timeout: 5))
+        existing.tap(); app.buttons["Rename"].tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        app.buttons["renameFolderPicker"].tap()
+        XCTAssertTrue(app.buttons["renameNewFolder"].waitForExistence(timeout: 5))
+        app.buttons["renameNewFolder"].tap()
+        app.alerts["New folder"].textFields.firstMatch.typeText("Created here")
+        app.alerts["New folder"].buttons["Create"].tap(); app.buttons["Save"].tap()
+        let moved = app.buttons["Options for Chosen name, Created here"]
+        XCTAssertTrue(moved.waitForExistence(timeout: 5))
+        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Rename folder selection saved"; screenshot.lifetime = .keepAlways; add(screenshot)
+        moved.tap(); app.buttons["Rename"].tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        let editor = XCTAttachment(screenshot: app.screenshot()); editor.name = "Rename clear field and folder chooser"; editor.lifetime = .keepAlways; add(editor)
+        app.buttons["renameFolderPicker"].tap(); app.buttons["chooseFolder-unarchived"].tap()
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(moved.exists)
+        app.terminate(); app.launch(); scrollArchive(app)
+        XCTAssertTrue(moved.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["folderHeader-Created here"].exists)
+    }
+
     @MainActor func testResetClearsPlayerAndImportPrecedesError() {
         let app = testApp(); app.launch()
         let link = app.textFields["linkField"]
@@ -229,7 +275,7 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(app.buttons["folderHeader-\(folderName)"].waitForExistence(timeout: 5))
         app.terminate(); app.launch(); scrollArchive(app)
         XCTAssertTrue(app.buttons["folderHeader-\(folderName)"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Unarchived ·")).firstMatch.exists)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "inbox ·")).firstMatch.exists)
         app.buttons["folderHeader-\(folderName)"].tap()
         XCTAssertTrue(app.buttons["Collapse \(folderName)"].exists)
         XCTAssertFalse(app.alerts["Rename folder"].exists)

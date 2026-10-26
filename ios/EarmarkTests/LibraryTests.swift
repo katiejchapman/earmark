@@ -6,6 +6,72 @@ import UIKit
 final class LibraryTests: XCTestCase {
     private func temporaryFile() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("library.json") }
 
+    func testWidgetSnapshotRoundTripAndPositionProjection() throws {
+        let now = Date(timeIntervalSince1970: 1000), file = temporaryFile()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var state = WidgetSnapshot(title: "A saved recording", folder: "Favorites", position: 80, duration: 100,
+            playing: true, loaded: true, dark: true, updated: now, sleepDeadline: now.addingTimeInterval(900))
+        try state.write(to: file)
+        XCTAssertEqual(try JSONDecoder().decode(WidgetSnapshot.self, from: Data(contentsOf: file)), state)
+        XCTAssertEqual(state.position(at: now.addingTimeInterval(10)), 90)
+        XCTAssertEqual(state.position(at: now.addingTimeInterval(300)), 100)
+        XCTAssertEqual(state.position(at: now.addingTimeInterval(-5)), 80)
+        state.playing = false
+        XCTAssertEqual(state.position(at: now.addingTimeInterval(10)), 80)
+        XCTAssertFalse(WidgetSnapshot.empty.loaded)
+    }
+
+    @MainActor func testWidgetActionsRestoreSkipAndResetWithoutRemovingArchive() async throws {
+        let file = temporaryFile(), directory = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let original = directory.appendingPathComponent("widget.caf")
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 8000, channels: 1))
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8000 * 40))
+        buffer.frameLength = buffer.frameCapacity
+        for i in 0..<Int(buffer.frameLength) { buffer.floatChannelData![0][i] = 0 }
+        do { let output = try AVAudioFile(forWriting: original, settings: format.settings); try output.write(from: buffer) }
+        let store = LibraryStore(file: directory.appendingPathComponent("App/library.json"))
+        let entry = try store.importAudio(original); store.select(entry.id); store.setPosition(20, for: entry.id)
+        let player = AudioPlayer(store: store)
+        player.handleWidgetAction("back")
+        for _ in 0..<100 where player.loading || abs(player.position - 5) > 0.3 { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertNil(player.message); XCTAssertEqual(player.currentID, entry.id)
+        XCTAssertEqual(player.position, 5, accuracy: 0.3)
+        player.handleWidgetAction("forward")
+        XCTAssertEqual(player.position, 20, accuracy: 0.3)
+        try await Task.sleep(for: .milliseconds(150))
+        player.handleWidgetAction("toggle")
+        try await Task.sleep(for: .milliseconds(300)); player.pause()
+        XCTAssertGreaterThanOrEqual(store.entry(entry.id)?.position ?? 0, 19.9)
+        player.handleWidgetAction("reset")
+        XCTAssertNil(player.currentID); XCTAssertNil(store.data.lastID)
+        XCTAssertEqual(store.data.entries.count, 1)
+        XCTAssertGreaterThanOrEqual(store.entry(entry.id)?.position ?? 0, 19.9)
+    }
+
+    func testWidgetStickersKeepSavedDesignAndOmitProtectedOverlaps() {
+        for small in [true, false] {
+            let size = CGSize(width: small ? 178 : 360, height: 178)
+            let layout = WidgetStereoLayout(size: size, small: small)
+            let safe = WidgetGem(id: UUID(), asset: "Gem_moon_blue", x: 0.25, y: layout.decoration.midY / size.height, size: 18, rotation: 17)
+            var onScreen = safe; onScreen.id = UUID(); onScreen.y = layout.lcd.midY / size.height
+            var offEdge = safe; offEdge.id = UUID(); offEdge.x = 0
+            var overlap = safe; overlap.id = UUID()
+            var tooLarge = safe; tooLarge.id = UUID(); tooLarge.x = 0.7; tooLarge.size = 120
+            let saved = WidgetDecorations(width: 362, height: 365, gems: [safe, onScreen, offEdge, overlap, tooLarge])
+            let visible = saved.visible(in: size, obstacles: layout.protectedRects)
+            XCTAssertEqual(visible.map(\.id), [safe.id])
+            XCTAssertEqual(visible.first?.asset, safe.asset)
+            XCTAssertEqual(visible.first?.rotation, safe.rotation)
+            XCTAssertLessThan(visible.first?.size ?? 100, safe.size)
+            XCTAssertEqual(saved.gems.count, 5) // Filtering never edits the saved app layout.
+        }
+        var state = WidgetSnapshot.empty
+        let now = Date(); state.updated = now; state.position = 20; state.duration = 200; state.playing = true
+        state.sleepDeadline = now.addingTimeInterval(5)
+        XCTAssertEqual(state.position(at: now.addingTimeInterval(100)), 25, accuracy: 0.01)
+    }
+
     @MainActor func testArchiveProgressPersistsAndOldLibrariesRemainReadable() throws {
         let file = temporaryFile(); let store = LibraryStore(file: file)
         let entry = try store.remember("https://example.com/progress.mp3")
@@ -249,12 +315,13 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(GemChoice.all.count, 48)
     }
 
-    @MainActor func testSleepCountdownUpdatesWhilePaused() async throws {
+    @MainActor func testSleepCountdownWaitsWhilePaused() async throws {
         let player = AudioPlayer(store: LibraryStore(file: temporaryFile()))
         player.setSleepTimer(seconds: 3)
         try await Task.sleep(for: .milliseconds(1150))
-        XCTAssertGreaterThan(player.sleepRemaining, 0)
-        XCTAssertLessThan(player.sleepRemaining, 2.5)
+        XCTAssertEqual(player.sleepRemaining, 3, accuracy: 0.01)
+        XCTAssertTrue(player.sleepActive)
+        XCTAssertNil(player.sleepDeadline)
         XCTAssertFalse(player.playing)
         player.cancelSleepTimer()
     }
@@ -307,6 +374,18 @@ final class LibraryTests: XCTestCase {
         _ = try store.remember("https://example.com/queued-while-playing.mp3")
         XCTAssertEqual(player.currentID, entry.id)
         XCTAssertTrue(player.playing)
+        player.setSleepTimer(seconds: 3)
+        try await Task.sleep(for: .milliseconds(500))
+        player.pause()
+        let remainingWhilePaused = player.sleepRemaining
+        XCTAssertGreaterThan(remainingWhilePaused, 2)
+        XCTAssertLessThan(remainingWhilePaused, 3)
+        XCTAssertNil(player.sleepDeadline)
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(player.sleepRemaining, remainingWhilePaused, accuracy: 0.05)
+        player.play()
+        for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertNotNil(player.sleepDeadline)
         player.setSleepTimer(seconds: 0.1)
         try await Task.sleep(for: .milliseconds(400))
         XCTAssertFalse(player.playing)
@@ -315,22 +394,22 @@ final class LibraryTests: XCTestCase {
         player.reset()
     }
 
-    @MainActor func testSleepTimerExpiresAndCancellationPreventsOldDeadline() async throws {
+    @MainActor func testPausedSleepTimerReplacementAndCancellation() async throws {
         let player = AudioPlayer(store: LibraryStore(file: temporaryFile()))
         player.setSleepTimer(seconds: 0.1)
-        XCTAssertNotNil(player.sleepDeadline)
+        XCTAssertTrue(player.sleepActive); XCTAssertNil(player.sleepDeadline)
         player.setSleepTimer(seconds: 5)
         try await Task.sleep(for: .milliseconds(200))
-        XCTAssertNotNil(player.sleepDeadline)
+        XCTAssertEqual(player.sleepRemaining, 5, accuracy: 0.01)
         player.cancelSleepTimer()
-        XCTAssertNil(player.sleepDeadline)
+        XCTAssertFalse(player.sleepActive); XCTAssertNil(player.sleepDeadline)
         player.setSleepTimer(seconds: 0.1)
         try await Task.sleep(for: .milliseconds(200))
-        XCTAssertNil(player.sleepDeadline)
+        XCTAssertTrue(player.sleepActive)
         XCTAssertFalse(player.playing)
         player.setSleepTimer(seconds: 60)
         player.reset()
-        XCTAssertNil(player.sleepDeadline)
+        XCTAssertFalse(player.sleepActive); XCTAssertNil(player.sleepDeadline)
     }
 
     @MainActor func testScrubReturnPositionPersistsWithoutChangingProgress() throws {

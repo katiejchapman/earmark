@@ -7,282 +7,463 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		361128AEBF8B699090EE02CC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAE9A9335F97805AB4F047FD /* Assets.xcassets */; };
-		7F4072864E415B7A1B676925 /* LibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B33264516B60757588C6476 /* LibraryTests.swift */; };
-		810F8432A478BA095A9C5556 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC0030C211164C8C0552B815 /* Library.swift */; };
-		849472BA099C5FECA371694C /* EarmarkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A2328CA6A0B3A1873E6ACE5 /* EarmarkApp.swift */; };
-		8B7E211E9FCBCCD9F406D819 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69D5426A726A097A0B61B23 /* Player.swift */; };
-		9C93BC8245BAAA51E48A4D54 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B87E8E7B60397106F177BB03 /* ContentView.swift */; };
-		AFB9412EB8D6140CF7CD3242 /* EarmarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 348A8A51DED7C00B552AABF9 /* EarmarkUITests.swift */; };
-		DC3AA80A06901EDE9657A6B1 /* AudioResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11B1E864EA53901FBA6C3DFB /* AudioResolver.swift */; };
-		41DC1D3850964682B40F19F3 /* Modak-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D099DB8DB947C62E7CAD72E7 /* Modak-Regular.ttf */; };
-		8BF329183BAA236A7F1E1368 /* Modak-License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 540B186189F7A96F24172ACA /* Modak-License.txt */; };
-		2815748A439705D45C790D3D /* Quicksand.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A307C418D1B2C1FE33B33473 /* Quicksand.ttf */; };
-		CF906780B6C583555412C56F /* Quicksand-License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 02AA062C9008C0DC1D7DFACC /* Quicksand-License.txt */; };
-		B5DA2C5CB8EB6C799EB4D259 /* StickerStudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19191EEEEC522580FDCAF223 /* StickerStudio.swift */; };
+		0176114E775942BB4C887B7C /* EarmarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06FD07F81F83183CE0A6BCD /* EarmarkUITests.swift */; };
+		15DA9A6861F95F10CC18A86A /* EarmarkWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B725BC0AEE24B5D732602CDF /* EarmarkWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		16AF69893763F8FE276509F2 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9071F13467C50CB7AA90C740 /* Player.swift */; };
+		17B60E163F16BD60B23CF8A0 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18C9390AEDEF5CFEF887E6F /* Library.swift */; };
+		242D8774A230FC1CD2768DDE /* Quicksand-License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 289B83F2C93A9E533B16CC5B /* Quicksand-License.txt */; };
+		311C67EC91BD74162F9E2B50 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 73AB2F9A7FD6D4E00B5D2129 /* Assets.xcassets */; };
+		3B333D8E798D0EF50DADC5B6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEA1D577D80347A5AD68E01F /* ContentView.swift */; };
+		59A57725DCB8720A17F57602 /* StickerStudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C9B6BC4C53AC09EB05416F1 /* StickerStudio.swift */; };
+		6025E9709960D0D771D6C60B /* Modak-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4FB3618CA994EE5A21C9A88C /* Modak-Regular.ttf */; };
+		613751C0B738CFA85CB53EE7 /* EarmarkWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6CF232855F8F176BCB65B6 /* EarmarkWidget.swift */; };
+		736E1B0A460A3448C5C73BE1 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A73709D5065982E368AE2CE /* WidgetSnapshot.swift */; };
+		790B76B2CF6D43A54EF640E7 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A73709D5065982E368AE2CE /* WidgetSnapshot.swift */; };
+		7C090835400343A1E162986F /* LibraryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14CA4BCCE58DB426E82D430F /* LibraryTests.swift */; };
+		993E714283AC171816219C8B /* WidgetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C9F470E5EE2EEF88E4F77DC /* WidgetBridge.swift */; };
+		D598E5F95A6C4C6FEB5559B9 /* StickerSheetIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E19BF574A50697FE208E34 /* StickerSheetIcon.swift */; };
+		D8198501723DC34A581CA7BC /* StickerSheetIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E19BF574A50697FE208E34 /* StickerSheetIcon.swift */; };
+		EFE16398BF268C9886ACE46B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4D40A5E202FDBB1253CB5625 /* Assets.xcassets */; };
+		F0A04FFCF2E4372035F6EFAC /* Modak-License.txt in Resources */ = {isa = PBXBuildFile; fileRef = BCD152B32552360261C89AB7 /* Modak-License.txt */; };
+		F2B1A9ED96233A83D84E62D4 /* Quicksand.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D64D37D9911CC44D8FE7AB36 /* Quicksand.ttf */; };
+		FEFCD8383220AD8EFD461247 /* AudioResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6286B220E55F8CFE860BD31 /* AudioResolver.swift */; };
+		FF5B7CD21EBC09DE26D40545 /* EarmarkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A80942B9233519CB8A4CCCE /* EarmarkApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		35FF992E431F6BA636D5A68C /* PBXContainerItemProxy */ = {
+		6AF2B409095D3AA734D53F0B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 2E0FED915C47DD28FDB943E8 /* Project object */;
+			containerPortal = 2717DA6E3D52FFCEAF4FA9E3 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 4023B64D87FB9F7DCB8677CA;
+			remoteGlobalIDString = 62A82C3750D1B41FA5C17C71;
 			remoteInfo = Earmark;
 		};
-		4FA13ECF7A9EEB104D666F65 /* PBXContainerItemProxy */ = {
+		84D991D2FD3C7696EB10598F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 2E0FED915C47DD28FDB943E8 /* Project object */;
+			containerPortal = 2717DA6E3D52FFCEAF4FA9E3 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 4023B64D87FB9F7DCB8677CA;
+			remoteGlobalIDString = 62A82C3750D1B41FA5C17C71;
 			remoteInfo = Earmark;
+		};
+		DD7E0C9A62C9F42287723ED9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2717DA6E3D52FFCEAF4FA9E3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CD3AF6C2CA5824C27A8C05EA;
+			remoteInfo = EarmarkWidget;
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		DDF0F48D21611DAFC230C19A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				15DA9A6861F95F10CC18A86A /* EarmarkWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		0A2BC799EA823DD553F3B79F /* EarmarkTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EarmarkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		11B1E864EA53901FBA6C3DFB /* AudioResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioResolver.swift; sourceTree = "<group>"; };
-		1C7DE4A5CA938E53610AB05B /* Earmark.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Earmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		348A8A51DED7C00B552AABF9 /* EarmarkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarmarkUITests.swift; sourceTree = "<group>"; };
-		64ECD0BE90D63530CF68F3C6 /* EarmarkUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EarmarkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		7A2328CA6A0B3A1873E6ACE5 /* EarmarkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarmarkApp.swift; sourceTree = "<group>"; };
-		8B33264516B60757588C6476 /* LibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTests.swift; sourceTree = "<group>"; };
-		955584DC8B0F3B8CCB85497D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		AAE9A9335F97805AB4F047FD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B87E8E7B60397106F177BB03 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		EC0030C211164C8C0552B815 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
-		F69D5426A726A097A0B61B23 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
-		D099DB8DB947C62E7CAD72E7 /* Modak-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Modak-Regular.ttf"; path = "Fonts/Modak-Regular.ttf"; sourceTree = "<group>"; };
-		540B186189F7A96F24172ACA /* Modak-License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Modak-License.txt"; path = "Fonts/Modak-License.txt"; sourceTree = "<group>"; };
-		A307C418D1B2C1FE33B33473 /* Quicksand.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Quicksand.ttf"; path = "Fonts/Quicksand.ttf"; sourceTree = "<group>"; };
-		02AA062C9008C0DC1D7DFACC /* Quicksand-License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "Quicksand-License.txt"; path = "Fonts/Quicksand-License.txt"; sourceTree = "<group>"; };
-		19191EEEEC522580FDCAF223 /* StickerStudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerStudio.swift; sourceTree = "<group>"; };
+		14CA4BCCE58DB426E82D430F /* LibraryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryTests.swift; sourceTree = "<group>"; };
+		1C53621BFB7E2CC8BD6927AC /* EarmarkUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EarmarkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1C9F470E5EE2EEF88E4F77DC /* WidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridge.swift; sourceTree = "<group>"; };
+		289B83F2C93A9E533B16CC5B /* Quicksand-License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Quicksand-License.txt"; sourceTree = "<group>"; };
+		2A80942B9233519CB8A4CCCE /* EarmarkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarmarkApp.swift; sourceTree = "<group>"; };
+		2DEB99B919C71D7E6CA49834 /* EarmarkWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EarmarkWidget.entitlements; sourceTree = "<group>"; };
+		4573AE5FC129701F6A12BC59 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4D40A5E202FDBB1253CB5625 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4FB3618CA994EE5A21C9A88C /* Modak-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Modak-Regular.ttf"; sourceTree = "<group>"; };
+		57386CCEC40EC4190767048D /* Earmark.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Earmark.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6A73709D5065982E368AE2CE /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
+		73AB2F9A7FD6D4E00B5D2129 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8C9B6BC4C53AC09EB05416F1 /* StickerStudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerStudio.swift; sourceTree = "<group>"; };
+		9071F13467C50CB7AA90C740 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		9A6CF232855F8F176BCB65B6 /* EarmarkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarmarkWidget.swift; sourceTree = "<group>"; };
+		A6E19BF574A50697FE208E34 /* StickerSheetIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerSheetIcon.swift; sourceTree = "<group>"; };
+		B725BC0AEE24B5D732602CDF /* EarmarkWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = EarmarkWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BCD152B32552360261C89AB7 /* Modak-License.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Modak-License.txt"; sourceTree = "<group>"; };
+		BEA1D577D80347A5AD68E01F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		C06FD07F81F83183CE0A6BCD /* EarmarkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarmarkUITests.swift; sourceTree = "<group>"; };
+		C146B56CBC9B9C5DAA1CCA3E /* Earmark.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Earmark.entitlements; sourceTree = "<group>"; };
+		C6286B220E55F8CFE860BD31 /* AudioResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioResolver.swift; sourceTree = "<group>"; };
+		C6480D1E4925E15F40C3A1A2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D18C9390AEDEF5CFEF887E6F /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
+		D64D37D9911CC44D8FE7AB36 /* Quicksand.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Quicksand.ttf; sourceTree = "<group>"; };
+		E0C5AED420C50D2E54113E71 /* EarmarkTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EarmarkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		2ECD55EA0A8B041EED1CE472 /* Products */ = {
+		17EFDE6E6E233F02D9672245 /* EarmarkWidget */ = {
 			isa = PBXGroup;
 			children = (
-				1C7DE4A5CA938E53610AB05B /* Earmark.app */,
-				0A2BC799EA823DD553F3B79F /* EarmarkTests.xctest */,
-				64ECD0BE90D63530CF68F3C6 /* EarmarkUITests.xctest */,
+				4D40A5E202FDBB1253CB5625 /* Assets.xcassets */,
+				2DEB99B919C71D7E6CA49834 /* EarmarkWidget.entitlements */,
+				9A6CF232855F8F176BCB65B6 /* EarmarkWidget.swift */,
+				C6480D1E4925E15F40C3A1A2 /* Info.plist */,
 			);
-			name = Products;
+			path = EarmarkWidget;
 			sourceTree = "<group>";
 		};
-		3C679A2A823174233E13E172 = {
+		370052A0D2316CF90299C891 /* EarmarkUITests */ = {
 			isa = PBXGroup;
 			children = (
-				C307836167CE954A66D7E341 /* Earmark */,
-				E2A194C74F4E0DCF8DD23EEA /* EarmarkTests */,
-				EEFE8CBDE59D91C32E14AE44 /* EarmarkUITests */,
-				2ECD55EA0A8B041EED1CE472 /* Products */,
+				C06FD07F81F83183CE0A6BCD /* EarmarkUITests.swift */,
 			);
+			path = EarmarkUITests;
 			sourceTree = "<group>";
 		};
-		C307836167CE954A66D7E341 /* Earmark */ = {
+		97B270801BCAD3D534706F29 /* EarmarkTests */ = {
 			isa = PBXGroup;
 			children = (
-				AAE9A9335F97805AB4F047FD /* Assets.xcassets */,
-				02AA062C9008C0DC1D7DFACC /* Quicksand-License.txt */,
-				A307C418D1B2C1FE33B33473 /* Quicksand.ttf */,
-				540B186189F7A96F24172ACA /* Modak-License.txt */,
-				D099DB8DB947C62E7CAD72E7 /* Modak-Regular.ttf */,
-				11B1E864EA53901FBA6C3DFB /* AudioResolver.swift */,
-				B87E8E7B60397106F177BB03 /* ContentView.swift */,
-				7A2328CA6A0B3A1873E6ACE5 /* EarmarkApp.swift */,
-				955584DC8B0F3B8CCB85497D /* Info.plist */,
-				EC0030C211164C8C0552B815 /* Library.swift */,
-				F69D5426A726A097A0B61B23 /* Player.swift */,
-				19191EEEEC522580FDCAF223 /* StickerStudio.swift */,
-			);
-			path = Earmark;
-			sourceTree = "<group>";
-		};
-		E2A194C74F4E0DCF8DD23EEA /* EarmarkTests */ = {
-			isa = PBXGroup;
-			children = (
-				8B33264516B60757588C6476 /* LibraryTests.swift */,
+				14CA4BCCE58DB426E82D430F /* LibraryTests.swift */,
 			);
 			path = EarmarkTests;
 			sourceTree = "<group>";
 		};
-		EEFE8CBDE59D91C32E14AE44 /* EarmarkUITests */ = {
+		97D3C97A4FEA4DF612949500 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
-				348A8A51DED7C00B552AABF9 /* EarmarkUITests.swift */,
+				A6E19BF574A50697FE208E34 /* StickerSheetIcon.swift */,
+				6A73709D5065982E368AE2CE /* WidgetSnapshot.swift */,
 			);
-			path = EarmarkUITests;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A032644286497AD8492946CC /* Earmark */ = {
+			isa = PBXGroup;
+			children = (
+				73AB2F9A7FD6D4E00B5D2129 /* Assets.xcassets */,
+				C6286B220E55F8CFE860BD31 /* AudioResolver.swift */,
+				BEA1D577D80347A5AD68E01F /* ContentView.swift */,
+				C146B56CBC9B9C5DAA1CCA3E /* Earmark.entitlements */,
+				2A80942B9233519CB8A4CCCE /* EarmarkApp.swift */,
+				4573AE5FC129701F6A12BC59 /* Info.plist */,
+				D18C9390AEDEF5CFEF887E6F /* Library.swift */,
+				9071F13467C50CB7AA90C740 /* Player.swift */,
+				8C9B6BC4C53AC09EB05416F1 /* StickerStudio.swift */,
+				1C9F470E5EE2EEF88E4F77DC /* WidgetBridge.swift */,
+				D42057D723557EA1F75B9AF4 /* Fonts */,
+			);
+			path = Earmark;
+			sourceTree = "<group>";
+		};
+		CD993AD92F2028552E3A95D9 = {
+			isa = PBXGroup;
+			children = (
+				A032644286497AD8492946CC /* Earmark */,
+				97B270801BCAD3D534706F29 /* EarmarkTests */,
+				370052A0D2316CF90299C891 /* EarmarkUITests */,
+				17EFDE6E6E233F02D9672245 /* EarmarkWidget */,
+				97D3C97A4FEA4DF612949500 /* Shared */,
+				FB88BBC50080BE95D0D88437 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D42057D723557EA1F75B9AF4 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				BCD152B32552360261C89AB7 /* Modak-License.txt */,
+				4FB3618CA994EE5A21C9A88C /* Modak-Regular.ttf */,
+				289B83F2C93A9E533B16CC5B /* Quicksand-License.txt */,
+				D64D37D9911CC44D8FE7AB36 /* Quicksand.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		FB88BBC50080BE95D0D88437 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				57386CCEC40EC4190767048D /* Earmark.app */,
+				E0C5AED420C50D2E54113E71 /* EarmarkTests.xctest */,
+				1C53621BFB7E2CC8BD6927AC /* EarmarkUITests.xctest */,
+				B725BC0AEE24B5D732602CDF /* EarmarkWidget.appex */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		4023B64D87FB9F7DCB8677CA /* Earmark */ = {
+		62A82C3750D1B41FA5C17C71 /* Earmark */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F170F9C61E155B2A2C906111 /* Build configuration list for PBXNativeTarget "Earmark" */;
+			buildConfigurationList = EB8FD315ACC9728097794B67 /* Build configuration list for PBXNativeTarget "Earmark" */;
 			buildPhases = (
-				8621CC55D19C854DFE66AB94 /* Sources */,
-				E4A2C9EAE9B8BD65D1800DC2 /* Resources */,
+				BF1B2A87DF8B0A272B014005 /* Sources */,
+				CB73735A36C0F19D946F1F60 /* Resources */,
+				DDF0F48D21611DAFC230C19A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				87177DAC033F28D2143CDDB2 /* PBXTargetDependency */,
 			);
 			name = Earmark;
 			packageProductDependencies = (
 			);
 			productName = Earmark;
-			productReference = 1C7DE4A5CA938E53610AB05B /* Earmark.app */;
+			productReference = 57386CCEC40EC4190767048D /* Earmark.app */;
 			productType = "com.apple.product-type.application";
 		};
-		B95B6CE95F5EEC67991C6EDA /* EarmarkTests */ = {
+		76E935BD76836DE6294AEF6B /* EarmarkTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 16E8A6A664688E5B377D398B /* Build configuration list for PBXNativeTarget "EarmarkTests" */;
+			buildConfigurationList = A2CC16E3917A0E53625BB34D /* Build configuration list for PBXNativeTarget "EarmarkTests" */;
 			buildPhases = (
-				3CBE289ABA5B5F6326173FA3 /* Sources */,
+				A79E97E94952E1627E0BFD51 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				7D6EF9A91F50E3FEA161DAD7 /* PBXTargetDependency */,
+				FDD90C200A25139F739EF855 /* PBXTargetDependency */,
 			);
 			name = EarmarkTests;
 			packageProductDependencies = (
 			);
 			productName = EarmarkTests;
-			productReference = 0A2BC799EA823DD553F3B79F /* EarmarkTests.xctest */;
+			productReference = E0C5AED420C50D2E54113E71 /* EarmarkTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		BCFB5468ED377F5B3745CE31 /* EarmarkUITests */ = {
+		81DCFE3730B644F8386B16BE /* EarmarkUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 22637147998FF7E6CA105F90 /* Build configuration list for PBXNativeTarget "EarmarkUITests" */;
+			buildConfigurationList = 860C388B7B28ABE93668D757 /* Build configuration list for PBXNativeTarget "EarmarkUITests" */;
 			buildPhases = (
-				7F6E0D73FB88F701560D0681 /* Sources */,
+				51D695CC77DEFCDD92D7C336 /* Sources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				F190A7B27B6726D364DF6AAC /* PBXTargetDependency */,
+				7E4D5267B3CFD2C16A905F2D /* PBXTargetDependency */,
 			);
 			name = EarmarkUITests;
 			packageProductDependencies = (
 			);
 			productName = EarmarkUITests;
-			productReference = 64ECD0BE90D63530CF68F3C6 /* EarmarkUITests.xctest */;
+			productReference = 1C53621BFB7E2CC8BD6927AC /* EarmarkUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		CD3AF6C2CA5824C27A8C05EA /* EarmarkWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EF650980675C3DA85F0C2634 /* Build configuration list for PBXNativeTarget "EarmarkWidget" */;
+			buildPhases = (
+				D8C78880B9ACA64736B97B3C /* Sources */,
+				D90BCE8961F2B3D2AB8AA326 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EarmarkWidget;
+			packageProductDependencies = (
+			);
+			productName = EarmarkWidget;
+			productReference = B725BC0AEE24B5D732602CDF /* EarmarkWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		2E0FED915C47DD28FDB943E8 /* Project object */ = {
+		2717DA6E3D52FFCEAF4FA9E3 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
-					4023B64D87FB9F7DCB8677CA = {
+					62A82C3750D1B41FA5C17C71 = {
+						DevelopmentTeam = V5J2P9R87P;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = "[\"com.apple.ApplicationGroups.iOS\": [\"enabled\": 1]]";
 					};
-					B95B6CE95F5EEC67991C6EDA = {
-						DevelopmentTeam = "";
+					76E935BD76836DE6294AEF6B = {
+						DevelopmentTeam = V5J2P9R87P;
 					};
-					BCFB5468ED377F5B3745CE31 = {
-						DevelopmentTeam = "";
-						TestTargetID = 4023B64D87FB9F7DCB8677CA;
+					81DCFE3730B644F8386B16BE = {
+						DevelopmentTeam = V5J2P9R87P;
+						TestTargetID = 62A82C3750D1B41FA5C17C71;
+					};
+					CD3AF6C2CA5824C27A8C05EA = {
+						DevelopmentTeam = V5J2P9R87P;
+						ProvisioningStyle = Automatic;
+						SystemCapabilities = "[\"com.apple.ApplicationGroups.iOS\": [\"enabled\": 1]]";
 					};
 				};
 			};
-			buildConfigurationList = 6BE04E3B87C9A5A2DBB20FC3 /* Build configuration list for PBXProject "Earmark" */;
+			buildConfigurationList = 8B7DE0937B9D9B68E79153A0 /* Build configuration list for PBXProject "earmark" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 3C679A2A823174233E13E172;
+			mainGroup = CD993AD92F2028552E3A95D9;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 2ECD55EA0A8B041EED1CE472 /* Products */;
+			productRefGroup = FB88BBC50080BE95D0D88437 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				4023B64D87FB9F7DCB8677CA /* Earmark */,
-				B95B6CE95F5EEC67991C6EDA /* EarmarkTests */,
-				BCFB5468ED377F5B3745CE31 /* EarmarkUITests */,
+				62A82C3750D1B41FA5C17C71 /* Earmark */,
+				76E935BD76836DE6294AEF6B /* EarmarkTests */,
+				81DCFE3730B644F8386B16BE /* EarmarkUITests */,
+				CD3AF6C2CA5824C27A8C05EA /* EarmarkWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		E4A2C9EAE9B8BD65D1800DC2 /* Resources */ = {
+		CB73735A36C0F19D946F1F60 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				361128AEBF8B699090EE02CC /* Assets.xcassets in Resources */,
-				CF906780B6C583555412C56F /* Quicksand-License.txt in Resources */,
-				2815748A439705D45C790D3D /* Quicksand.ttf in Resources */,
-				8BF329183BAA236A7F1E1368 /* Modak-License.txt in Resources */,
-				41DC1D3850964682B40F19F3 /* Modak-Regular.ttf in Resources */,
+				311C67EC91BD74162F9E2B50 /* Assets.xcassets in Resources */,
+				F0A04FFCF2E4372035F6EFAC /* Modak-License.txt in Resources */,
+				6025E9709960D0D771D6C60B /* Modak-Regular.ttf in Resources */,
+				242D8774A230FC1CD2768DDE /* Quicksand-License.txt in Resources */,
+				F2B1A9ED96233A83D84E62D4 /* Quicksand.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D90BCE8961F2B3D2AB8AA326 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EFE16398BF268C9886ACE46B /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		3CBE289ABA5B5F6326173FA3 /* Sources */ = {
+		51D695CC77DEFCDD92D7C336 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7F4072864E415B7A1B676925 /* LibraryTests.swift in Sources */,
+				0176114E775942BB4C887B7C /* EarmarkUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		7F6E0D73FB88F701560D0681 /* Sources */ = {
+		A79E97E94952E1627E0BFD51 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AFB9412EB8D6140CF7CD3242 /* EarmarkUITests.swift in Sources */,
+				7C090835400343A1E162986F /* LibraryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		8621CC55D19C854DFE66AB94 /* Sources */ = {
+		BF1B2A87DF8B0A272B014005 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DC3AA80A06901EDE9657A6B1 /* AudioResolver.swift in Sources */,
-				9C93BC8245BAAA51E48A4D54 /* ContentView.swift in Sources */,
-				849472BA099C5FECA371694C /* EarmarkApp.swift in Sources */,
-				810F8432A478BA095A9C5556 /* Library.swift in Sources */,
-				8B7E211E9FCBCCD9F406D819 /* Player.swift in Sources */,
-				B5DA2C5CB8EB6C799EB4D259 /* StickerStudio.swift in Sources */,
+				FEFCD8383220AD8EFD461247 /* AudioResolver.swift in Sources */,
+				3B333D8E798D0EF50DADC5B6 /* ContentView.swift in Sources */,
+				FF5B7CD21EBC09DE26D40545 /* EarmarkApp.swift in Sources */,
+				17B60E163F16BD60B23CF8A0 /* Library.swift in Sources */,
+				16AF69893763F8FE276509F2 /* Player.swift in Sources */,
+				D598E5F95A6C4C6FEB5559B9 /* StickerSheetIcon.swift in Sources */,
+				59A57725DCB8720A17F57602 /* StickerStudio.swift in Sources */,
+				993E714283AC171816219C8B /* WidgetBridge.swift in Sources */,
+				736E1B0A460A3448C5C73BE1 /* WidgetSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D8C78880B9ACA64736B97B3C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				613751C0B738CFA85CB53EE7 /* EarmarkWidget.swift in Sources */,
+				D8198501723DC34A581CA7BC /* StickerSheetIcon.swift in Sources */,
+				790B76B2CF6D43A54EF640E7 /* WidgetSnapshot.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		7D6EF9A91F50E3FEA161DAD7 /* PBXTargetDependency */ = {
+		7E4D5267B3CFD2C16A905F2D /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 4023B64D87FB9F7DCB8677CA /* Earmark */;
-			targetProxy = 35FF992E431F6BA636D5A68C /* PBXContainerItemProxy */;
+			target = 62A82C3750D1B41FA5C17C71 /* Earmark */;
+			targetProxy = 84D991D2FD3C7696EB10598F /* PBXContainerItemProxy */;
 		};
-		F190A7B27B6726D364DF6AAC /* PBXTargetDependency */ = {
+		87177DAC033F28D2143CDDB2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 4023B64D87FB9F7DCB8677CA /* Earmark */;
-			targetProxy = 4FA13ECF7A9EEB104D666F65 /* PBXContainerItemProxy */;
+			target = CD3AF6C2CA5824C27A8C05EA /* EarmarkWidget */;
+			targetProxy = DD7E0C9A62C9F42287723ED9 /* PBXContainerItemProxy */;
+		};
+		FDD90C200A25139F739EF855 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 62A82C3750D1B41FA5C17C71 /* Earmark */;
+			targetProxy = 6AF2B409095D3AA734D53F0B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		1452029B86DF2C4F0A69D225 /* Release */ = {
+		08D2F4EAF8653A42D9B39334 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.EarmarkUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Earmark;
+			};
+			name = Release;
+		};
+		16278122CB15E5FF11244F54 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.EarmarkTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Earmark.app/Earmark";
+			};
+			name = Release;
+		};
+		1E8D7C03B73D6CEAF94C85BA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = EarmarkWidget/EarmarkWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EarmarkWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.earmark.widget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		38840A67ED95B9B273C9C17A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Earmark/Earmark.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = V5J2P9R87P;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Earmark/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = earmark;
@@ -299,108 +480,9 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Release;
-		};
-		354F9C2C64D928337C4CD6AE /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"$(inherited)",
-					"DEBUG=1",
-				);
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = iphoneos;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
 			name = Debug;
 		};
-		471DA023B6DBD7E2AF7A2554 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.EarmarkUITests;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Earmark;
-			};
-			name = Debug;
-		};
-		5D135114BB78C03C9240A91F /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				GENERATE_INFOPLIST_FILE = YES;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
-				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.EarmarkTests;
-				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Earmark.app/Earmark";
-			};
-			name = Debug;
-		};
-		991EC36D3C0F8BACF5172059 /* Release */ = {
+		3CCA40613BA0681E521826FE /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -435,7 +517,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = V5J2P9R87P;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -458,31 +540,36 @@
 			};
 			name = Release;
 		};
-		9C314E4A7D0AA9FB41D0D796 /* Release */ = {
+		726A84AFEC7C32641CFF982C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = EarmarkWidget/EarmarkWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EarmarkWidget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
-					"@loader_path/Frameworks",
+					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.EarmarkUITests;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.earmark.widget;
 				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = Earmark;
 			};
 			name = Release;
 		};
-		B8BE349D9584B1A1AD451BD9 /* Debug */ = {
+		812011A492873385EC0420BD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Earmark/Earmark.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = V5J2P9R87P;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Earmark/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = earmark;
@@ -499,9 +586,9 @@
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
-			name = Debug;
+			name = Release;
 		};
-		FB1A1E13822962BE60EE82D5 /* Release */ = {
+		8CC34364BE2ACC500EE30CCF /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -516,48 +603,139 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Earmark.app/Earmark";
 			};
-			name = Release;
+			name = Debug;
+		};
+		91F7491B5CA03C02973503E8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = V5J2P9R87P;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F0123E54B68E855FC97CCCE6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.katiechapman.EarmarkUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Earmark;
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		16E8A6A664688E5B377D398B /* Build configuration list for PBXNativeTarget "EarmarkTests" */ = {
+		860C388B7B28ABE93668D757 /* Build configuration list for PBXNativeTarget "EarmarkUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				5D135114BB78C03C9240A91F /* Debug */,
-				FB1A1E13822962BE60EE82D5 /* Release */,
+				F0123E54B68E855FC97CCCE6 /* Debug */,
+				08D2F4EAF8653A42D9B39334 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		22637147998FF7E6CA105F90 /* Build configuration list for PBXNativeTarget "EarmarkUITests" */ = {
+		8B7DE0937B9D9B68E79153A0 /* Build configuration list for PBXProject "earmark" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				471DA023B6DBD7E2AF7A2554 /* Debug */,
-				9C314E4A7D0AA9FB41D0D796 /* Release */,
+				91F7491B5CA03C02973503E8 /* Debug */,
+				3CCA40613BA0681E521826FE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		6BE04E3B87C9A5A2DBB20FC3 /* Build configuration list for PBXProject "Earmark" */ = {
+		A2CC16E3917A0E53625BB34D /* Build configuration list for PBXNativeTarget "EarmarkTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				354F9C2C64D928337C4CD6AE /* Debug */,
-				991EC36D3C0F8BACF5172059 /* Release */,
+				8CC34364BE2ACC500EE30CCF /* Debug */,
+				16278122CB15E5FF11244F54 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		F170F9C61E155B2A2C906111 /* Build configuration list for PBXNativeTarget "Earmark" */ = {
+		EB8FD315ACC9728097794B67 /* Build configuration list for PBXNativeTarget "Earmark" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				B8BE349D9584B1A1AD451BD9 /* Debug */,
-				1452029B86DF2C4F0A69D225 /* Release */,
+				38840A67ED95B9B273C9C17A /* Debug */,
+				812011A492873385EC0420BD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EF650980675C3DA85F0C2634 /* Build configuration list for PBXNativeTarget "EarmarkWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1E8D7C03B73D6CEAF94C85BA /* Debug */,
+				726A84AFEC7C32641CFF982C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 2E0FED915C47DD28FDB943E8 /* Project object */;
+	rootObject = 2717DA6E3D52FFCEAF4FA9E3 /* Project object */;
 }

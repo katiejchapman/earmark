@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
+               BlueprintIdentifier = "62A82C3750D1B41FA5C17C71"
                BuildableName = "Earmark.app"
                BlueprintName = "Earmark"
                ReferencedContainer = "container:earmark.xcodeproj">
@@ -32,7 +32,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
+            BlueprintIdentifier = "62A82C3750D1B41FA5C17C71"
             BuildableName = "Earmark.app"
             BlueprintName = "Earmark"
             ReferencedContainer = "container:earmark.xcodeproj">
@@ -44,7 +44,7 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B95B6CE95F5EEC67991C6EDA"
+               BlueprintIdentifier = "76E935BD76836DE6294AEF6B"
                BuildableName = "EarmarkTests.xctest"
                BlueprintName = "EarmarkTests"
                ReferencedContainer = "container:earmark.xcodeproj">
@@ -55,7 +55,7 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "BCFB5468ED377F5B3745CE31"
+               BlueprintIdentifier = "81DCFE3730B644F8386B16BE"
                BuildableName = "EarmarkUITests.xctest"
                BlueprintName = "EarmarkUITests"
                ReferencedContainer = "container:earmark.xcodeproj">
@@ -79,7 +79,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
+            BlueprintIdentifier = "62A82C3750D1B41FA5C17C71"
             BuildableName = "Earmark.app"
             BlueprintName = "Earmark"
             ReferencedContainer = "container:earmark.xcodeproj">
@@ -96,7 +96,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
+            BlueprintIdentifier = "62A82C3750D1B41FA5C17C71"
             BuildableName = "Earmark.app"
             BlueprintName = "Earmark"
             ReferencedContainer = "container:earmark.xcodeproj">

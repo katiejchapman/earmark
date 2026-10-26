@@ -17,9 +17,10 @@
 			<array>
 				<string>public.audio</string>
 				<string>public.mpeg-4-audio</string>
-				<string>public.mpeg-4</string>
 				<string>public.mp3</string>
 				<string>com.microsoft.waveform-audio</string>
+				<string>public.mpeg-4</string>
+				<string>public.movie</string>
 			</array>
 		</dict>
 	</array>
@@ -35,6 +36,17 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.katiechapman.earmark.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>earmark</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
@@ -44,6 +56,11 @@
 		<key>NSAllowsArbitraryLoadsForMedia</key>
 		<true/>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Modak-Regular.ttf</string>
+		<string>Quicksand.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -54,11 +71,6 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UIAppFonts</key>
-	<array>
-		<string>Modak-Regular.ttf</string>
-		<string>Quicksand.ttf</string>
 	</array>
 </dict>
 </plist>

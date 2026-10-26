@@ -17,15 +17,20 @@ struct EarmarkApp: App {
         #else
         store = LibraryStore()
         #endif
+        let studio = StickerStudioStore(file: store.audioDirectory.deletingLastPathComponent().appendingPathComponent("decorations.json"))
+        let player = AudioPlayer(store: store)
+        player.widgetDecorations = { [weak studio] in studio?.widgetDecorations ?? .empty }
         _store = StateObject(wrappedValue: store)
-        _player = StateObject(wrappedValue: AudioPlayer(store: store))
-        _studio = StateObject(wrappedValue: StickerStudioStore(file: store.audioDirectory.deletingLastPathComponent().appendingPathComponent("decorations.json")))
+        _player = StateObject(wrappedValue: player)
+        _studio = StateObject(wrappedValue: studio)
     }
     var body: some Scene {
         WindowGroup {
             ContentView(store: store, player: player, studio: studio)
                 .preferredColorScheme(dark ? .dark : .light)
-                .task { player.restoreLast() }
+                .task { player.restoreLast(); player.publishWidget() }
+                .onChange(of: studio.saved) { _, _ in player.publishWidget() }
+                .onChange(of: dark) { _, _ in player.publishWidget() }
                 .onChange(of: phase) { _, phase in if phase != .active { player.savePosition() } }
         }
     }
