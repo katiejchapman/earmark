@@ -18,7 +18,7 @@
                BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
                BuildableName = "Earmark.app"
                BlueprintName = "Earmark"
-               ReferencedContainer = "container:Earmark.xcodeproj">
+               ReferencedContainer = "container:earmark.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -35,7 +35,7 @@
             BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
             BuildableName = "Earmark.app"
             BlueprintName = "Earmark"
-            ReferencedContainer = "container:Earmark.xcodeproj">
+            ReferencedContainer = "container:earmark.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -47,7 +47,7 @@
                BlueprintIdentifier = "B95B6CE95F5EEC67991C6EDA"
                BuildableName = "EarmarkTests.xctest"
                BlueprintName = "EarmarkTests"
-               ReferencedContainer = "container:Earmark.xcodeproj">
+               ReferencedContainer = "container:earmark.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -58,7 +58,7 @@
                BlueprintIdentifier = "BCFB5468ED377F5B3745CE31"
                BuildableName = "EarmarkUITests.xctest"
                BlueprintName = "EarmarkUITests"
-               ReferencedContainer = "container:Earmark.xcodeproj">
+               ReferencedContainer = "container:earmark.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -82,7 +82,7 @@
             BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
             BuildableName = "Earmark.app"
             BlueprintName = "Earmark"
-            ReferencedContainer = "container:Earmark.xcodeproj">
+            ReferencedContainer = "container:earmark.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -99,7 +99,7 @@
             BlueprintIdentifier = "4023B64D87FB9F7DCB8677CA"
             BuildableName = "Earmark.app"
             BlueprintName = "Earmark"
-            ReferencedContainer = "container:Earmark.xcodeproj">
+            ReferencedContainer = "container:earmark.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

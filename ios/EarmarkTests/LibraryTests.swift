@@ -6,6 +6,49 @@ import UIKit
 final class LibraryTests: XCTestCase {
     private func temporaryFile() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("library.json") }
 
+    @MainActor func testSelectionPersistsBeforeAudioResolution() throws {
+        let file = temporaryFile(); let store = LibraryStore(file: file)
+        let first = try store.remember("https://example.com/old.mp3")
+        let current = try store.remember("https://example.com/new.mp3")
+        store.select(first.id); store.setPosition(189, for: current.id)
+        let player = AudioPlayer(store: store)
+        player.load(try XCTUnwrap(store.entry(current.id)))
+        let reopened = LibraryStore(file: file)
+        XCTAssertEqual(reopened.data.lastID, current.id)
+        XCTAssertEqual(reopened.entry(current.id)?.position, 189)
+        XCTAssertEqual(reopened.data.entries.count, 2)
+        player.reset()
+    }
+
+    @MainActor func testStickersRejectProtectedSurfacesAndEachOtherIncludingRotation() throws {
+        let file = temporaryFile()
+        let studio = StickerStudioStore(file: file); studio.begin()
+        studio.draft = []
+        let stereo = CGRect(x: 20, y: 40, width: 320, height: 400)
+        let screen = CGRect(x: 40, y: 70, width: 280, height: 100)
+        let controls = CGRect(x: 80, y: 240, width: 200, height: 50)
+        studio.updateLayout(stereo: stereo, obstacles: [screen, controls])
+        let safe = PlacedGem(asset: GemChoice.all[0].id, x: 0.5, y: 0.8, size: 28)
+        XCTAssertTrue(studio.place(safe))
+        var overlap = safe; overlap.id = UUID()
+        XCTAssertFalse(studio.place(overlap))
+        var blocked = safe; blocked.id = UUID(); blocked.y = 0.15
+        XCTAssertFalse(studio.place(blocked)) // Screen.
+        blocked.y = 0.55
+        XCTAssertFalse(studio.place(blocked)) // Playback controls.
+        blocked.y = 0.42; blocked.size = 70; blocked.rotation = 45
+        XCTAssertFalse(studio.place(blocked)) // Rotated corner touches protected area.
+        blocked.x = 0.01; blocked.y = 0.9; blocked.size = 28
+        XCTAssertFalse(studio.place(blocked)) // Outside stereo.
+        studio.adjust(safe.id, scale: 5, rotation: 45)
+        XCTAssertEqual(studio.draft.first?.size, 28) // Invalid resize leaves original intact.
+        studio.add(GemChoice.all[1])
+        XCTAssertEqual(studio.draft.count, 2)
+        XCTAssertTrue(studio.draft.allSatisfy { studio.canPlace($0) })
+        studio.finish()
+        XCTAssertEqual(StickerStudioStore(file: file).saved.count, 2)
+    }
+
     @MainActor func testDeleteUndoKeepsLocalAudioAndInterveningProgress() throws {
         let file = temporaryFile(); let store = LibraryStore(file: file)
         let entry = try store.remember("https://example.com/keep.mp3")
@@ -445,6 +488,7 @@ final class LibraryTests: XCTestCase {
         let entry = try store.importAudio(original)
         store.setPosition(1.25, for: entry.id)
         let folder = store.addFolder("Voice notes"); store.move(entry.id, to: folder)
+        store.select(entry.id)
         try FileManager.default.removeItem(at: original)
         let reopened = LibraryStore(file: libraryURL)
         let restored = try XCTUnwrap(reopened.entry(entry.id))
@@ -452,7 +496,8 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(restored.folder, "Voice notes")
         XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(reopened.playbackURL(for: restored)).path))
         let player = AudioPlayer(store: reopened)
-        player.load(restored)
+        player.restoreLast()
+        XCTAssertEqual(player.currentID, restored.id)
         for _ in 0..<100 where player.loading { try await Task.sleep(nanoseconds: 100_000_000) }
         XCTAssertFalse(player.loading)
         XCTAssertNil(player.message)

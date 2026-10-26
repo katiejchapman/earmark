@@ -123,7 +123,8 @@ final class AudioPlayer: ObservableObject {
         savePosition(); player.pause(); loadTask?.cancel()
         status = nil; player.replaceCurrentItem(with: nil)
         generation = UUID(); let token = generation
-        currentID = entry.id; source = nil; position = entry.position; duration = 0
+        currentID = entry.id; store.select(entry.id)
+        source = nil; position = entry.position; duration = 0
         wantsPlayback = autoplay; loading = true; restoring = true; playing = false; message = nil; lastSaved = -1
         loadTask = Task {
             do {

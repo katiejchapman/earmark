@@ -46,6 +46,8 @@ final class StickerStudioStore: ObservableObject {
     @Published var activeID: UUID?
     @Published var error: String?
     private let file: URL
+    private var layoutSize: CGSize?
+    private var blocked: [CGRect] = []
     private var pristine = true
     private var unreadable = false
 
@@ -86,27 +88,74 @@ final class StickerStudioStore: ObservableObject {
         } catch { self.error = "Couldn’t save decorations: \(error.localizedDescription)" }
     }
     func changePage(_ delta: Int) { page = min(pageCount - 1, max(0, page + delta)) }
-    func place(_ gem: PlacedGem) {
-        guard editing else { return }
+    // Collision checks include the rotated artwork, a four-point gap, and every protected control.
+    private func footprint(_ gem: PlacedGem, in size: CGSize) -> CGRect {
+        let radians = gem.rotation * .pi / 180
+        let side = gem.size * (abs(cos(radians)) + abs(sin(radians)))
+        return CGRect(x: gem.x * size.width - side / 2, y: gem.y * size.height - side / 2, width: side, height: side)
+    }
+    func canPlace(_ gem: PlacedGem, among others: [PlacedGem]? = nil) -> Bool {
+        guard let size = layoutSize else { return true }
+        let rect = footprint(gem, in: size)
+        guard CGRect(origin: .zero, size: size).insetBy(dx: 7, dy: 7).contains(rect),
+              !blocked.contains(where: { $0.insetBy(dx: -4, dy: -4).intersects(rect) }) else { return false }
+        return !(others ?? draft).contains { $0.id != gem.id && footprint($0, in: size).insetBy(dx: -4, dy: -4).intersects(rect) }
+    }
+    @discardableResult func place(_ gem: PlacedGem) -> Bool {
+        guard editing, canPlace(gem) else { return false }
         if let index = draft.firstIndex(where: { $0.id == gem.id }) { draft[index] = gem }
         else { draft.append(gem) }
         selectedID = gem.id
+        return true
+    }
+    private func nearestPlacement(_ original: PlacedGem, among others: [PlacedGem], mayShrink: Bool) -> PlacedGem? {
+        guard let size = layoutSize else { return original }
+        if canPlace(original, among: others) { return original }
+        let sizes = mayShrink ? [original.size, min(original.size, 24), min(original.size, 16), 8] : [original.size]
+        for width in sizes {
+            var candidates: [PlacedGem] = []
+            for y in stride(from: 12.0, through: Double(size.height) - 12, by: 6) {
+                for x in stride(from: 12.0, through: Double(size.width) - 12, by: 6) {
+                    var gem = original; gem.size = width; gem.x = x / size.width; gem.y = y / size.height
+                    if canPlace(gem, among: others) { candidates.append(gem) }
+                }
+            }
+            if let closest = candidates.min(by: {
+                hypot(($0.x-original.x)*size.width, ($0.y-original.y)*size.height) < hypot(($1.x-original.x)*size.width, ($1.y-original.y)*size.height)
+            }) { return closest }
+        }
+        return nil
+    }
+    func add(_ choice: GemChoice) {
+        guard editing else { return }
+        let gem = PlacedGem(asset: choice.id, x: 0.5, y: 0.7, size: 28)
+        if let safe = nearestPlacement(gem, among: draft, mayShrink: true) { place(safe) }
     }
     func remove(_ id: UUID?) { guard editing, let id else { return }; draft.removeAll { $0.id == id }; if selectedID == id { selectedID = nil } }
     func adjust(_ id: UUID, scale: Double = 1, rotation: Double = 0) {
         guard editing, let index = draft.firstIndex(where: { $0.id == id }) else { return }
-        draft[index].size = min(120, max(8, draft[index].size * scale)); draft[index].rotation += rotation
+        var gem = draft[index]
+        gem.size = min(120, max(8, gem.size * scale)); gem.rotation += rotation
+        place(gem)
     }
-    func layoutDefaults(stereo: CGRect?, controls: CGRect?) {
-        guard pristine, !editing, let stereo, let controls, stereo.width > 0, stereo.height > 0 else { return }
-        var gems = saved
-        guard gems.count == 3 else { return }
-        let y = controls.minY - stereo.minY
-        gems[0].x = 38 / stereo.width; gems[0].y = (y + 13) / stereo.height
-        gems[1].x = 57 / stereo.width; gems[1].y = (y + controls.height - 11) / stereo.height
-        gems[2].x = (stereo.width - 37) / stereo.width; gems[2].y = (y + 32) / stereo.height
-        if gems != saved { saved = gems; draft = gems }
+    func updateLayout(stereo: CGRect?, obstacles: [CGRect]) {
+        guard let stereo, stereo.width > 0, stereo.height > 0 else { return }
+        let local = obstacles.map { $0.offsetBy(dx: -stereo.minX, dy: -stereo.minY) }
+        guard layoutSize != stereo.size || blocked != local else { return }
+        layoutSize = stereo.size; blocked = local
+        // Existing artwork is moved to the nearest free metal surface after a layout change.
+        // Its IDs, shapes and rotations remain intact; persistence happens when Done is chosen.
+        func arrange(_ gems: [PlacedGem]) -> [PlacedGem] {
+            var result: [PlacedGem] = []
+            for gem in gems {
+                if let safe = nearestPlacement(gem, among: result, mayShrink: true) { result.append(safe) }
+            }
+            return result
+        }
+        if !editing { let safe = arrange(saved); if safe != saved { saved = safe; draft = safe } }
+        else { let safe = arrange(draft); if safe != draft { draft = safe } }
     }
+
 }
 
 struct StudioFramesKey: PreferenceKey {
@@ -168,10 +217,11 @@ struct StickerSheet: View {
                     .accessibilityLabel("Done decorating").accessibilityIdentifier("stickerDone")
             }
             .buttonStyle(.plain)
+            VStack(spacing: 10) {
             HStack(spacing: 0) {
                 ForEach(studio.choices) { choice in
                     Button {
-                        studio.place(PlacedGem(asset: choice.id, x: 0.5, y: 0.7, size: 35))
+                        studio.add(choice)
                     } label: {
                         Image(choice.id).resizable().scaledToFit().frame(width: 44, height: 44)
                             .frame(maxWidth: .infinity, minHeight: 60)
@@ -193,13 +243,14 @@ struct StickerSheet: View {
                         .accessibilityIdentifier("stickerPage-\(page)")
                 }
             }
-        }
+            }
         .padding(14)
         .background {
             RoundedRectangle(cornerRadius: 3).fill(LinearGradient(colors: [.white.opacity(0.16), .white.opacity(0.025), .white.opacity(0.10)], startPoint: .topLeading, endPoint: .bottomTrailing))
         }
         .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(LinearGradient(colors: [.white.opacity(0.75), .gray.opacity(0.25), .white.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing)))
         .shadow(color: .black.opacity(0.12), radius: 3, y: 2)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stickerSheet")
     }
@@ -284,6 +335,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         guard studio?.editing == true, bounds.contains(point) else { return nil }
         if session != nil { return self }
         if local("sheet")?.contains(point) == true { return self }
+        if frames.keys.filter({ $0.hasPrefix("protected-") }).contains(where: { local($0)?.contains(point) == true }) { return nil }
         if hitGem(point) != nil { return self }
         return nil
     }
@@ -328,7 +380,8 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
 
     @objc private func panned(_ gesture: UIPanGestureRecognizer) {
         guard var current = session else { return }
-        let delta = gesture.translation(in: self)
+        let finger = gesture.location(in: self)
+        let delta = CGPoint(x: finger.x - current.origin.x, y: finger.y - current.origin.y)
         if current.handleTransform {
             let point = gesture.location(in: self)
             let distance = hypot(point.x - current.center.x, point.y - current.center.y)
@@ -352,6 +405,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
     private func startTransform() {
         guard var current = session, !current.gem.asset.isEmpty else { return }
         current.paging = false; current.transformed = true; current.panBase = current.center
+        current.origin = pan.location(in: self)
         pan.setTranslation(.zero, in: self); session = current
     }
     func beginSourceSession(_ choice: GemChoice, at point: CGPoint) {
@@ -406,7 +460,8 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         guard let stereo = local("stereo"), stereo.contains(current.center) else { return }
         current.gem.x = (current.center.x - stereo.minX) / stereo.width
         current.gem.y = (current.center.y - stereo.minY) / stereo.height
-        current.gem.constrain(to: stereo.size); studio.place(current.gem)
+        current.gem.constrain(to: stereo.size)
+        if !studio.place(current.gem) { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
     }
     private func findScrollView(_ view: UIView?) -> UIScrollView? {
         guard let view else { return nil }

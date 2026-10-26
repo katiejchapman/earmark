@@ -1,4 +1,4 @@
-name: Earmark
+name: earmark
 options:
   bundleIdPrefix: com.katiechapman
   deploymentTarget:
