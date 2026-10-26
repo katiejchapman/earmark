@@ -43,12 +43,16 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(link.waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["saveArchive"].exists)
         XCTAssertEqual(app.buttons["loadLink"].label, "load")
-        XCTAssertEqual(app.textFields["linkField"].frame.midY, app.buttons["importAudio"].frame.midY, accuracy: 2)
-        XCTAssertLessThan(app.textFields["linkField"].frame.maxX, app.buttons["importAudio"].frame.midX)
-        XCTAssertLessThan(app.buttons["importAudio"].frame.midX, app.buttons["loadLink"].frame.midX)
+        XCTAssertTrue(app.buttons["sourceLink"].exists)
+        XCTAssertTrue(app.buttons["sourceFile"].exists)
+        XCTAssertLessThan(app.buttons["sourceFile"].frame.maxX, link.frame.minX)
+        XCTAssertLessThan(link.frame.maxX, app.buttons["loadLink"].frame.midX)
         XCTAssertLessThan(app.buttons["loadLink"].frame.midX, app.buttons["saveArchive"].frame.midX)
-        XCTAssertEqual(app.buttons["loadLink"].frame.midY, app.buttons["importAudio"].frame.midY, accuracy: 2)
-        XCTAssertEqual(app.buttons["loadLink"].frame.midY, app.buttons["saveArchive"].frame.midY, accuracy: 2)
+        XCTAssertEqual(link.frame.midY, app.buttons["sourceFile"].frame.midY, accuracy: 2)
+        XCTAssertEqual(link.frame.midY, app.buttons["loadLink"].frame.midY, accuracy: 2)
+        XCTAssertEqual(link.frame.midY, app.buttons["saveArchive"].frame.midY, accuracy: 2)
+        XCTAssertEqual(app.buttons["sleepTimer"].frame.midY, app.buttons["Play"].frame.midY, accuracy: 2)
+        XCTAssertEqual(app.buttons["resetPlayer"].frame.midY, app.buttons["Play"].frame.midY, accuracy: 2)
         link.tap(); link.typeText("https://example.com/saved-only.mp3")
         app.buttons["loadLink"].tap()
         let light = app.otherElements["loadedLight"]
@@ -74,7 +78,7 @@ final class EarmarkUITests: XCTestCase {
         let field = app.textFields["linkField"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap(); field.typeText("https://example.com/archive-only.mp3")
-        app.buttons["saveArchive"].tap(); app.buttons["archiveLink"].tap()
+        app.buttons["saveArchive"].tap()
         XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "A little listening time")
         XCTAssertFalse(app.otherElements["loadedLight"].exists)
         scrollArchive(app)
@@ -106,7 +110,7 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "stickerSource-")).count, 5)
         let source = app.buttons["stickerSource-Gem_heart_green"]
         let target = app.otherElements["stereoPlayer"]
-        let destination = target.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.675))
+        let destination = target.coordinate(withNormalizedOffset: CGVector(dx: 0.40, dy: 0.80))
         let dropPoint = destination.screenPoint
         source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.3, thenDragTo: destination, withVelocity: .slow, thenHoldForDuration: 0.2)
         let placed = app.images["Placed heart green sticker"]
@@ -197,7 +201,7 @@ final class EarmarkUITests: XCTestCase {
         app.buttons["loadLink"].tap()
         let error = app.staticTexts["error"]
         XCTAssertTrue(error.waitForExistence(timeout: 15))
-        XCTAssertLessThan(app.buttons["importAudio"].frame.maxY, error.frame.minY)
+        XCTAssertLessThan(app.buttons["sourceFile"].frame.maxY, error.frame.minY)
         app.buttons["resetPlayer"].tap()
         XCTAssertFalse(error.exists)
         XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "A little listening time")
@@ -268,6 +272,9 @@ final class EarmarkUITests: XCTestCase {
     }
     @MainActor func testImportAudioOpensFilesPicker() {
         let app = testApp(); app.launch()
+        XCTAssertTrue(app.buttons["sourceFile"].waitForExistence(timeout: 5))
+        app.buttons["sourceFile"].tap()
+        XCTAssertFalse(app.textFields["linkField"].exists)
         let button = app.buttons["importAudio"]
         XCTAssertTrue(button.waitForExistence(timeout: 5))
         button.tap()
@@ -275,6 +282,9 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5))
         cancel.tap()
         XCTAssertTrue(app.buttons["importAudio"].exists)
+        XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "A little listening time")
+        app.buttons["sourceLink"].tap()
+        XCTAssertTrue(app.textFields["linkField"].exists)
     }
 
 }

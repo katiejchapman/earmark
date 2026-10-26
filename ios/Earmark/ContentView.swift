@@ -37,7 +37,8 @@ struct ContentView: View {
     @State private var exporting = false
     @State private var importing = false
     @State private var importingAudio = false
-    @State private var archiveOnlyImport = false
+    @State private var sourceIsFile = false
+    @State private var stagedAudio: [URL] = []
     @State private var creatingFolder = false
     @State private var backup = LibraryDocument()
     @State private var pendingRestore: Data?
@@ -98,7 +99,7 @@ struct ContentView: View {
         .overlay { StickerTouchLayer(studio: studio, frames: studioFrames).allowsHitTesting(studio.editing) }
         .onPreferenceChange(StudioFramesKey.self) { frames in
             studioFrames = frames
-            studio.updateLayout(stereo: frames["stereo"], obstacles: frames.filter { $0.key.hasPrefix("protected-") }.sorted { $0.key < $1.key }.map { $0.value })
+            studio.updateLayout(stereo: frames["stereo"], decoration: frames["decoration"], obstacles: frames.filter { $0.key.hasPrefix("protected-") }.sorted { $0.key < $1.key }.map { $0.value })
         }
         .onChange(of: studio.error) { _, error in if let error { notice = error } }
         .tint(rose)
@@ -113,7 +114,7 @@ struct ContentView: View {
         .confirmationDialog("Audio options", isPresented: Binding(get: { archiveActions != nil }, set: { if !$0 { archiveActions = nil } }), titleVisibility: .hidden, presenting: archiveActions) { entry in
             Button(entry.isFeed ? "Refresh feed" : "Load in player") {
                 player.load(entry)
-                if entry.localFilename == nil { link = entry.url.absoluteString }
+                if entry.localFilename == nil { sourceIsFile = false; link = entry.url.absoluteString }
             }
             Button("Rename") { editing = entry }
             Button(entry.listened == true ? "Mark as unlistened" : "Mark as listened") {
@@ -132,12 +133,9 @@ struct ContentView: View {
             do {
                 let urls = try result.get()
                 if importingAudio {
-                    var first: Recording?
-                    for url in urls {
-                        let entry = try store.importAudio(url)
-                        if first == nil { first = entry }
-                    }
-                    if let first, !archiveOnlyImport { player.load(first) }
+                    let staged = try AudioSelection.stage(urls)
+                    clearStagedAudio()
+                    stagedAudio = staged
                 } else if let url = urls.first {
                     let accessed = url.startAccessingSecurityScopedResource()
                     defer { if accessed { url.stopAccessingSecurityScopedResource() } }
@@ -146,6 +144,8 @@ struct ContentView: View {
                 }
             } catch { notice = "Couldn’t import: \(error.localizedDescription)" }
         }
+        .onDisappear { clearStagedAudio() }
+        .onChange(of: sourceIsFile) { _, isFile in if !isFile { clearStagedAudio() } }
         .onOpenURL { url in
             guard url.isFileURL else { return }
             do { player.load(try store.importAudio(url)) }
@@ -210,32 +210,41 @@ struct ContentView: View {
     private var linkField: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 6) {
-                LinkInput(text: $link, focused: Binding(get: { linkFocused }, set: { linkFocused = $0 }), onSubmit: loadLink) { _ in }
-                    .padding(.horizontal, 9).padding(.vertical, 5)
-                    .frame(minWidth: 60, maxWidth: .infinity).frame(height: 34)
-                    .background(card, in: RoundedRectangle(cornerRadius: 11))
-                Button { archiveOnlyImport = player.currentID != nil; importingAudio = true; importing = true } label: {
-                    HStack(spacing: 3) { Image(systemName: "folder.badge.plus"); Text("add file") }
-                        .font(AppType.fixed(11, weight: 600)).frame(width: 66, height: 32)
-                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(rose.opacity(0.65)))
+                HStack(spacing: 1) {
+                    sourceToggle("link", file: false)
+                    sourceToggle("file", file: true)
+                }
+                .padding(3).frame(width: 80, height: 34)
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.secondary.opacity(0.35)))
+                .accessibilityElement(children: .contain).accessibilityLabel("Audio source")
+                if sourceIsFile {
+                    Button { linkFocused = false; importingAudio = true; importing = true } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.badge.plus")
+                            Text(stagedAudio.first.map { stagedAudio.count == 1 ? $0.lastPathComponent : "\(stagedAudio.count) files" } ?? "add file")
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                        .font(AppType.fixed(11)).frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 8).frame(height: 34)
+                        .background(card, in: RoundedRectangle(cornerRadius: 11))
                         .frame(height: 44)
-                }.buttonStyle(.plain).accessibilityIdentifier("importAudio")
-                Button("load", action: loadLink).font(AppType.fixed(11, weight: 600))
-                    .frame(width: 44, height: 32)
-                    .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(rose.opacity(0.65)))
+                    }.buttonStyle(.plain).accessibilityIdentifier("importAudio")
+                } else {
+                    LinkInput(text: $link, focused: Binding(get: { linkFocused }, set: { linkFocused = $0 }), onSubmit: loadLink) { _ in }
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .frame(minWidth: 30, maxWidth: .infinity).frame(height: 34)
+                        .background(card, in: RoundedRectangle(cornerRadius: 11))
+                }
+                Button("load") { performSource(load: true) }
+                    .font(AppType.fixed(11, weight: 650)).foregroundStyle(Color(hex: 0x563243))
+                    .frame(width: 43, height: 34).background(rose, in: RoundedRectangle(cornerRadius: 11))
                     .frame(height: 44).buttonStyle(.plain).accessibilityIdentifier("loadLink")
-                Menu {
-                    Button("Save link to archive", systemImage: "link") { saveLink() }
-                        .accessibilityIdentifier("archiveLink")
-                    Button("Save files to archive", systemImage: "folder.badge.plus") {
-                        archiveOnlyImport = true; importingAudio = true; importing = true
-                    }.accessibilityIdentifier("archiveFile")
-                } label: {
+                Button { performSource(load: false) } label: {
                     Image(systemName: "tray.and.arrow.down").font(.system(size: 15))
-                        .frame(width: 34, height: 32)
+                        .frame(width: 32, height: 34)
                         .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(rose.opacity(0.65)))
                         .frame(height: 44)
-                }.buttonStyle(.borderless).accessibilityLabel("Save to archive").accessibilityIdentifier("saveArchive")
+                }.buttonStyle(.plain).accessibilityLabel("Save to archive").accessibilityIdentifier("saveArchive")
             }
             if let duplicate = store.duplicateNotice {
                 Text(duplicate).font(AppType.font(.caption1)).foregroundStyle(rose).accessibilityIdentifier("duplicateNotice")
@@ -245,14 +254,29 @@ struct ContentView: View {
             }
         }
     }
-    private func saveLink() {
-        do { _ = try store.remember(link); linkFocused = false }
-        catch { notice = error.localizedDescription }
+    private func sourceToggle(_ title: String, file: Bool) -> some View {
+        Button { linkFocused = false; sourceIsFile = file } label: {
+            Text(title).font(AppType.fixed(10, weight: 600)).frame(maxWidth: .infinity).frame(height: 28)
+                .background(sourceIsFile == file ? card : .clear, in: RoundedRectangle(cornerRadius: 7))
+                .frame(height: 44).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier(file ? "sourceFile" : "sourceLink")
+            .accessibilityAddTraits(sourceIsFile == file ? .isSelected : [])
     }
-    private func loadLink() {
-        do { let entry = try store.remember(link); player.load(entry); linkFocused = false }
-        catch { notice = error.localizedDescription }
+    private func clearStagedAudio() {
+        AudioSelection.remove(stagedAudio); stagedAudio = []
     }
+    private func performSource(load: Bool) {
+        do {
+            let entries: [Recording]
+            if sourceIsFile {
+                guard !stagedAudio.isEmpty else { importingAudio = true; importing = true; return }
+                entries = try stagedAudio.map { try store.importAudio($0) }
+            } else { entries = [try store.remember(link)] }
+            if load, let first = entries.first { player.load(first) }
+            linkFocused = false
+        } catch { notice = error.localizedDescription }
+    }
+    private func loadLink() { performSource(load: true) }
 
     private var playerCard: some View {
         VStack(spacing: 12) {
@@ -301,23 +325,24 @@ struct ContentView: View {
                     }.buttonStyle(.plain).accessibilityLabel(remaining ? "Show total time" : "Show time remaining")
                 }.font(AppType.fixed(12)).monospacedDigit()
                     .protectedStereo("time")
-                controls.padding(.top, -3).protectedStereo("playback")
+                HStack(spacing: 4) {
+                    SleepControl(player: player, active: player.sleepDeadline != nil, dark: dark).equatable().protectedStereo("sleep")
+                    Spacer(minLength: 0)
+                    controls.protectedStereo("playback")
+                    Spacer(minLength: 0)
+                    Button {
+                        store.duplicateNotice = nil
+                        player.reset(); scrub = nil; link = ""; linkFocused = false
+                    } label: {
+                        Text("reset").font(AppType.fixed(10))
+                            .frame(width: 50, height: 26)
+                            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
+                            .frame(width: 50, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityIdentifier("resetPlayer").protectedStereo("reset")
+                }.padding(.top, -3)
             }
-            Color.clear.frame(height: 26)
-            HStack {
-                SleepControl(player: player, active: player.sleepDeadline != nil, dark: dark).equatable().protectedStereo("sleep")
-                Spacer()
-            Button {
-                store.duplicateNotice = nil
-                player.reset(); scrub = nil; link = ""; linkFocused = false
-            } label: {
-                Text("reset").font(AppType.fixed(11))
-                    .frame(width: 58, height: 26)
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
-                    .frame(width: 58, height: 44).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain).accessibilityIdentifier("resetPlayer").protectedStereo("reset")
-            }
+            Color.clear.frame(height: 30)
+                .background(GeometryReader { geometry in Color.clear.preference(key: StudioFramesKey.self, value: ["decoration": geometry.frame(in: .global)]) })
             HStack(spacing: 10) {
                 Group {
                     if player.currentID != nil {
@@ -333,7 +358,6 @@ struct ContentView: View {
                 Button { studio.editing ? studio.finish() : studio.begin() } label: {
                     StickerSheetIcon().frame(width: 23, height: 23)
                         .frame(width: 38, height: 30)
-                        .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(Color(hex: dark ? 0xaaa3ac : 0x777e75)))
                         .frame(height: 44)
                 }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityLabel("Decorate stereo")
                     .accessibilityIdentifier("decorateStereo").protectedStereo("decorate")
@@ -348,19 +372,19 @@ struct ContentView: View {
         .accessibilityElement(children: .contain).accessibilityIdentifier("stereoPlayer")
     }
     private var controls: some View {
-        HStack(spacing: 18) {
-            control("« 15", label: "Back 15 seconds", size: 44) { player.skip(-15) }
-            control(player.playing ? "pause.fill" : "play.fill", label: player.playing ? "Pause" : "Play", size: 58, main: true) { player.toggle() }
-            control("15 »", label: "Forward 15 seconds", size: 44) { player.skip(15) }
+        HStack(spacing: 8) {
+            control("« 15", label: "Back 15 seconds", size: 32) { player.skip(-15) }
+            control(player.playing ? "pause.fill" : "play.fill", label: player.playing ? "Pause" : "Play", size: 42, main: true) { player.toggle() }
+            control("15 »", label: "Forward 15 seconds", size: 32) { player.skip(15) }
         }
-        .frame(maxWidth: .infinity, minHeight: 58)
+        .frame(minHeight: 44)
         .background(GeometryReader { geometry in Color.clear.preference(key: StudioFramesKey.self, value: ["controls": geometry.frame(in: .global)]) })
     }
     private func control(_ icon: String, label: String, size: CGFloat, main: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Group {
                 if main {
-                    Image(systemName: icon).font(.system(size: 20, weight: .medium))
+                    Image(systemName: icon).font(.system(size: 17, weight: .medium))
                 } else {
                     HStack(spacing: 3) {
                         if icon.hasPrefix("«") { Text("«") }
@@ -374,7 +398,7 @@ struct ContentView: View {
                 .foregroundStyle(main ? Color(hex: 0x583346) : Color(hex: dark ? 0xfaf2f7 : 0x303831))
                 .background(Color(hex: main ? 0xdfa3bf : (dark ? 0x66656e : 0xd3d7ce)), in: Circle())
                 .overlay(Circle().strokeBorder(Color(hex: main ? 0xb97998 : (dark ? 0x928693 : 0x858c82)), lineWidth: main ? 3 : 1))
-        }.buttonStyle(.plain).accessibilityLabel(label).disabled(player.currentID == nil)
+        }.frame(height: 44).buttonStyle(.plain).accessibilityLabel(label).disabled(player.currentID == nil)
     }
     @ViewBuilder private var sleepCountdown: some View {
         if player.sleepDeadline != nil {
@@ -493,17 +517,23 @@ struct ContentView: View {
             Divider().padding(.bottom, 10)
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(entry.title).font(AppType.font(.subheadline, weight: 600)).fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(entry.listened == true ? Color(hex: dark ? 0x9fc8c2 : 0x49796f) : .primary)
-                    Text(showFolder ? (entry.folder ?? "Unarchived") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
-                         .font(AppType.font(.caption1)).foregroundStyle(.secondary)
-                    if entry.listened != true && !entry.isFeed {
-                        HStack(spacing: 8) {
-                            ProgressView(value: progress ?? 0).tint(rose).frame(maxWidth: .infinity)
-                            Text(percent).font(AppType.fixed(10, weight: 600)).monospacedDigit()
-                                .foregroundStyle(.secondary).frame(minWidth: 29, alignment: .trailing)
-                        }.padding(.top, 2).accessibilityHidden(true)
+                    HStack(spacing: 10) {
+                        Text(entry.title).font(AppType.font(.subheadline, weight: 600)).lineLimit(2)
+                            .foregroundStyle(entry.listened == true ? Color(hex: dark ? 0x9fc8c2 : 0x49796f) : .primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if entry.listened != true && !entry.isFeed {
+                            HStack(spacing: 5) {
+                                GeometryReader { geometry in
+                                    Capsule().fill(.secondary.opacity(0.25))
+                                    Capsule().fill(rose).frame(width: geometry.size.width * (progress ?? 0))
+                                }.frame(width: 41, height: 3)
+                                Text(percent).font(AppType.fixed(9, weight: 600)).monospacedDigit()
+                                    .foregroundStyle(.secondary).frame(minWidth: 24, alignment: .trailing)
+                            }.accessibilityHidden(true)
+                        }
                     }
+                    Text(showFolder ? (entry.folder ?? "Unarchived") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
+                        .font(AppType.font(.caption1)).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 if entry.listened == true {
@@ -585,7 +615,7 @@ private struct LinkInput: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> Field {
         let field = Field()
-        field.placeholder = "link"
+        field.placeholder = "enter link"
         field.accessibilityIdentifier = "linkField"
         field.font = AppType.uiFont(.subheadline)
         field.adjustsFontForContentSizeCategory = true
@@ -624,7 +654,7 @@ private struct SleepControl: View, Equatable {
                 Button("Cancel sleep timer", role: .destructive) { player.cancelSleepTimer() }.buttonStyle(.automatic)
             }
         } label: {
-            Text("sleep").font(AppType.fixed(11)).frame(width: 58, height: 26)
+            Text("sleep").font(AppType.fixed(10)).frame(width: 50, height: 26)
                 .foregroundStyle(active ? Color(hex: 0x583346) : Color.primary)
                 .background(active ? rose : Color.clear, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))

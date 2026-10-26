@@ -307,3 +307,31 @@ final class LibraryStore: ObservableObject {
         catch { storageError = "Couldn’t save your library: \(error.localizedDescription)" }
     }
 }
+
+// Files picked from providers may lose access after the picker closes. Keep a
+// temporary private copy until the user chooses load/save, without archiving yet.
+enum AudioSelection {
+    static func stage(_ urls: [URL]) throws -> [URL] {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("earmark-selection-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var copies: [URL] = []
+        do {
+            for url in urls {
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                let subdirectory = directory.appendingPathComponent(UUID().uuidString)
+                try FileManager.default.createDirectory(at: subdirectory, withIntermediateDirectories: true)
+                let copy = subdirectory.appendingPathComponent(url.lastPathComponent)
+                try FileManager.default.copyItem(at: url, to: copy)
+                copies.append(copy)
+            }
+            return copies
+        } catch { try? FileManager.default.removeItem(at: directory); throw error }
+    }
+    static func remove(_ urls: [URL]) {
+        for directory in Set(urls.map { $0.deletingLastPathComponent().deletingLastPathComponent() }) {
+            guard directory.lastPathComponent.hasPrefix("earmark-selection-") else { continue }
+            try? FileManager.default.removeItem(at: directory)
+        }
+    }
+}

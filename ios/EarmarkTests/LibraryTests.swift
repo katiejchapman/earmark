@@ -72,6 +72,56 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(StickerStudioStore(file: file).saved.count, 2)
     }
 
+    @MainActor func testGemMotionStopsAtEdgesSlidesAndCannotTunnel() throws {
+        let studio = StickerStudioStore(file: temporaryFile()); studio.begin(); studio.draft = []
+        studio.updateLayout(stereo: CGRect(x: 0, y: 0, width: 320, height: 400),
+                            obstacles: [CGRect(x: 140, y: 60, width: 2, height: 260)])
+        let start = PlacedGem(asset: GemChoice.all[0].id, x: 0.25, y: 0.4, size: 20)
+        XCTAssertTrue(studio.place(start))
+        var target = start; target.x = 0.9; target.y = 0.6
+        let stopped = studio.limitedMotion(from: start, to: target)
+        XCTAssertEqual(stopped.x * 320, 126, accuracy: 1)
+        XCTAssertEqual(stopped.y, 0.6, accuracy: 0.002)
+        XCTAssertTrue(studio.canPlace(stopped))
+        XCTAssertTrue(studio.place(stopped))
+        target = stopped; target.x = 0.2
+        let reversed = studio.limitedMotion(from: stopped, to: target)
+        XCTAssertEqual(reversed.x, 0.2, accuracy: 0.002)
+        // The other gem is also a solid limit.
+        var other = start; other.id = UUID(); other.x = 0.2; other.y = 0.8
+        XCTAssertTrue(studio.place(other))
+        target = reversed; target.y = 0.95
+        let againstGem = studio.limitedMotion(from: reversed, to: target)
+        XCTAssertLessThan(againstGem.y, 0.75)
+        XCTAssertTrue(studio.canPlace(againstGem))
+        var larger = stopped; larger.size = 120; larger.rotation = 45
+        let resized = studio.limitedMotion(from: stopped, to: larger)
+        XCTAssertTrue(studio.canPlace(resized))
+        XCTAssertLessThan(resized.size, 120)
+        studio.place(resized); studio.finish()
+    }
+
+    @MainActor func testFileSelectionWaitsForActionAndRetainsOriginalName() throws {
+        let file = temporaryFile(), store = LibraryStore(file: file)
+        let playing = try store.remember("https://example.com/current.mp3"); store.select(playing.id)
+        let source = file.deletingLastPathComponent().appendingPathComponent("chosen.m4a")
+        try Data([1, 3, 5, 7]).write(to: source)
+        let selected = try AudioSelection.stage([source]); defer { AudioSelection.remove(selected) }
+        XCTAssertEqual(selected.first?.lastPathComponent, "chosen.m4a")
+        try FileManager.default.removeItem(at: source)
+        XCTAssertEqual(store.data.entries.count, 1)
+        XCTAssertEqual(store.data.lastID, playing.id)
+        let saved = try store.importAudio(XCTUnwrap(selected.first))
+        XCTAssertEqual(store.data.entries.count, 2)
+        XCTAssertEqual(store.data.lastID, playing.id) // Save does not replace the player.
+        store.rename(saved.id, title: "Renamed", show: "")
+        XCTAssertEqual(try store.importAudio(XCTUnwrap(selected.first)).id, saved.id)
+        XCTAssertEqual(store.data.entries.count, 2)
+        AudioSelection.remove(selected)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(selected.first).path))
+        XCTAssertNotNil(store.playbackURL(for: saved))
+    }
+
     @MainActor func testDeleteUndoKeepsLocalAudioAndInterveningProgress() throws {
         let file = temporaryFile(); let store = LibraryStore(file: file)
         let entry = try store.remember("https://example.com/keep.mp3")
