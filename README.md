@@ -11,7 +11,7 @@ Open [ios/earmark.xcodeproj](ios/earmark.xcodeproj) in Xcode to build the curren
 
 The app stores its library, imported audio copies, and decorations on the iPhone. Installing an update over the same app preserves this data; deleting the app removes it. Personal device backups are excluded from this repository.
 
-`index.html` and `earmark.html` preserve the original standalone web player. Numbered files in `previews/` preserve the design history; [inline-source v4](previews/controls-and-sources-v4.html) is the latest interactive design preview, not the native app. No earlier previews have been overwritten. The separate [mini stereo widget mockup](previews/mini-stereo-widget-v3.html) shows small and medium concepts in both themes; these historical HTML concepts are preserved. The app now includes a native small/medium mini stereo widget: open earmark once after installing, then search earmark in the Home Screen’s Add Widget gallery. Playback and skip buttons use background audio intents; the sleep picker opens the app. iOS manages refresh timing.
+`index.html` and `earmark.html` preserve the original standalone web player. Numbered files in `previews/` preserve the design history; [inline-source v4](previews/controls-and-sources-v4.html) is the latest interactive design preview, not the native app. No earlier previews have been overwritten. The separate [mini stereo widget mockup](previews/mini-stereo-widget-v3.html) shows small and medium concepts in both themes; these historical HTML concepts are preserved. The app now includes a native small/medium mini stereo widget: open earmark once after installing, then search earmark in the Home Screen’s Add Widget gallery. Playback, skip, and inline sleep choices use background audio intents. iOS manages refresh timing.
 
 ## Checks
 
@@ -21,3 +21,5 @@ xcodebuild test -project ios/earmark.xcodeproj -scheme Earmark -destination 'pla
 ```
 
 The generated Xcode project and native artwork are included. No Node dependencies are needed to build the iPhone app.
+
+Daily iCloud-folder backups are available through archive → … → Automatic backups. Choose a folder in iCloud Drive; exports run while the app is active or reopened and include imported audio. Podcast imports can recognize matching existing folders and episode names from filenames or embedded tags.

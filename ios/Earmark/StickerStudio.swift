@@ -104,7 +104,8 @@ final class StickerStudioStore: ObservableObject {
     func canPlace(_ gem: PlacedGem, among others: [PlacedGem]? = nil) -> Bool {
         guard let size = layoutSize else { return true }
         let rect = footprint(gem, in: size)
-        guard CGRect(origin: .zero, size: size).insetBy(dx: 7, dy: 7).contains(rect),
+        let surface = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size).insetBy(dx: 2, dy: 2), cornerRadius: 28)
+        guard [CGPoint(x: rect.minX, y: rect.minY), CGPoint(x: rect.maxX, y: rect.minY), CGPoint(x: rect.minX, y: rect.maxY), CGPoint(x: rect.maxX, y: rect.maxY)].allSatisfy(surface.contains),
               !blocked.contains(where: { $0.insetBy(dx: -0.25, dy: -0.25).intersects(rect) }) else { return false }
         return !(others ?? draft).contains { $0.id != gem.id && footprint($0, in: size).insetBy(dx: -0.25, dy: -0.25).intersects(rect) }
     }

@@ -59,6 +59,12 @@ struct StereoWidgetView: View {
         GeometryReader { geometry in
             let layout = WidgetStereoLayout(size: geometry.size, small: small)
             VStack(spacing: layout.gap) {
+                HStack(spacing: 0) {
+                    ForEach(0..<11, id: \.self) { index in
+                        if index > 0 { Spacer(minLength: 1) }
+                        Image("RoundRhinestone").resizable().preserveWidgetColor().scaledToFit().frame(width: 8, height: 8)
+                    }
+                }.frame(height: layout.jewels.height).padding(.horizontal, small ? 0 : 22)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(state.title).font(.system(size: small ? 12 : 14, weight: .semibold, design: .monospaced)).lineLimit(1)
                     HStack(spacing: 3) {
@@ -103,6 +109,14 @@ struct StereoWidgetView: View {
                 HStack(spacing: 9) {
                     Circle().fill(state.playing ? Color.red : Color(red: 0.24, green: 0.08, blue: 0.11)).frame(width: 6, height: 6)
                         .shadow(color: state.playing ? .red.opacity(0.85) : .clear, radius: 3).frame(width: 14)
+                    if state.sleepChoosing == true {
+                        HStack(spacing: 3) {
+                            sleepChoice("5", action: "sleep-5")
+                            sleepChoice("15", action: "sleep-15")
+                            sleepChoice("30", action: "sleep-30")
+                            sleepChoice("cancel", action: "sleep-cancel")
+                        }.frame(maxWidth: .infinity)
+                    } else {
                     Canvas { context, size in
                         for x in stride(from: 1.0, to: size.width, by: 4) {
                             for y in stride(from: 1.0, to: size.height, by: 4) {
@@ -110,7 +124,9 @@ struct StereoWidgetView: View {
                             }
                         }
                     }.background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 5)).clipShape(RoundedRectangle(cornerRadius: 5))
-                    auxiliary("sleep", action: "sleep")
+                        .frame(height: 12)
+                    auxiliary("sleep", action: "sleep-options")
+                    }
                 }.frame(height: layout.footer.height)
             }
             .padding(.horizontal, layout.inset).padding(.vertical, 11)
@@ -130,18 +146,25 @@ struct StereoWidgetView: View {
     }
     private func transport(_ text: String, action: String, main: Bool = false) -> some View {
         Button(intent: StereoPlaybackIntent(action: action)) {
-            Text(text).font(.system(size: main ? 12 : 9, weight: .semibold, design: .rounded))
-                .frame(width: main ? 30 : 24, height: main ? 30 : 24)
+            Text(text).font(.system(size: main ? 16 : 11, weight: .semibold, design: .rounded))
+                .frame(width: main ? 38 : 30, height: main ? 38 : 30)
                 .foregroundStyle(main ? Color(red: 0.35, green: 0.20, blue: 0.28) : Color.white)
                 .background(main ? pink : Color(white: 0.28), in: Circle())
                 .overlay(Circle().strokeBorder(main ? Color(red: 0.72, green: 0.47, blue: 0.60) : Color(white: 0.65), lineWidth: 1))
         }.buttonStyle(.plain).accessibilityLabel(action == "toggle" ? (state.playing ? "Pause" : "Play") : "Skip 15 seconds")
     }
     private func auxiliary(_ text: String, action: String) -> some View {
-        Link(destination: url(action)) {
+        Button(intent: StereoPlaybackIntent(action: action)) {
             Text(text).font(.system(size: small ? 7 : 8, design: .rounded)).frame(width: small ? 24 : 34, height: 18)
+                .background(state.sleepRemaining > 0 ? pink : .clear, in: RoundedRectangle(cornerRadius: 6))
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(ink.opacity(0.7)))
-        }
+        }.buttonStyle(.plain).accessibilityLabel("Sleep timer")
+    }
+    private func sleepChoice(_ text: String, action: String) -> some View {
+        Button(intent: StereoPlaybackIntent(action: action)) {
+            Text(text).font(.system(size: 8, design: .rounded)).frame(minWidth: text == "cancel" ? 29 : 22, minHeight: 20)
+                .background(pink.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
+        }.buttonStyle(.plain).accessibilityLabel(text == "cancel" ? "Cancel sleep timer" : text + " minute sleep timer")
     }
 }
 

@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import CryptoKit
+import AVFoundation
 
 struct Recording: Identifiable, Codable, Equatable {
     var id = UUID()
@@ -32,6 +33,20 @@ struct LibraryData: Codable {
     var folders: [String] = []
     var lastID: UUID?
     var queue: [UUID]?
+}
+
+// Portable exports include the bytes of imported recordings as well as the archive.
+struct AudioLibraryBackup: Codable {
+    var library: LibraryData
+    var audioFiles: [String: Data]
+    static func encode(library: LibraryData, directory: URL) throws -> Data {
+        var files: [String: Data] = [:]
+        for name in Set(library.entries.compactMap(\.localFilename)) {
+            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\") else { throw CocoaError(.fileReadCorruptFile) }
+            files[name] = try Data(contentsOf: directory.appendingPathComponent(name))
+        }
+        return try JSONEncoder().encode(Self(library: library, audioFiles: files))
+    }
 }
 
 @MainActor
@@ -83,7 +98,10 @@ final class LibraryStore: ObservableObject {
             if notifyDuplicate { duplicateNotice = "File already saved." }
             return entry
         }
-        let entry = Recording(url: url, title: url.deletingPathExtension().lastPathComponent.removingPercentEncoding ?? "Audio")
+        var entry = Recording(url: url, title: url.deletingPathExtension().lastPathComponent.removingPercentEncoding ?? "Audio")
+        if let inferred = PodcastFolderMatch.filename(entry.title, folders: data.folders) {
+            entry.title = inferred.title; entry.show = inferred.folder; entry.folder = inferred.folder
+        }
         data.entries.insert(entry, at: 0)
         save()
         return entry
@@ -142,15 +160,32 @@ final class LibraryStore: ObservableObject {
                 return data.entries[index]
             }
         }
-        let name = UUID().uuidString + "." + incoming.pathExtension.lowercased()
+        let handle = try FileHandle(forReadingFrom: incoming)
+        let header = try handle.read(upToCount: 16) ?? Data(); try handle.close()
+        var suffix = incoming.pathExtension.lowercased()
+        if header.count >= 12, String(data: header[4..<8], encoding: .ascii) == "ftyp" {
+            let brand = String(data: header[8..<12], encoding: .ascii) ?? ""
+            if brand == "M4A " { suffix = "m4a" }
+            else if suffix == "mp3" { suffix = "mp4" }
+        }
+        let name = UUID().uuidString + "." + suffix
         let destination = audioDirectory.appendingPathComponent(name)
         try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
         try FileManager.default.copyItem(at: incoming, to: destination)
         var entry = Recording(url: destination, title: incoming.deletingPathExtension().lastPathComponent)
         entry.localFilename = name
         entry.contentHash = digest
+        if let inferred = PodcastFolderMatch.filename(entry.title, folders: data.folders) {
+            entry.title = inferred.title; entry.show = inferred.folder; entry.folder = inferred.folder
+        }
         data.entries.insert(entry, at: 0)
         save()
+        let importedID = entry.id, originalTitle = incoming.deletingPathExtension().lastPathComponent
+        Task { [weak self] in
+            let metadata = await AudioResolver.metadata(AVURLAsset(url: destination), fallback: originalTitle, folders: self?.data.folders ?? [])
+            guard let self, let current = self.entry(importedID), metadata.title != nil || metadata.show != nil else { return }
+            _ = self.apply(ResolvedAudio(source: nil, title: metadata.title ?? current.title, show: metadata.show ?? current.show), to: importedID)
+        }
         return entry
     }
 
@@ -177,7 +212,7 @@ final class LibraryStore: ObservableObject {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, let entry = entry(id) else { return }
         let show = show.trimmingCharacters(in: .whitespacesAndNewlines)
-        let folder = entry.manualFolder ? entry.folder : addFolder(show)
+        let folder = entry.manualFolder ? entry.folder : (PodcastFolderMatch.folder(for: show, folders: data.folders) ?? addFolder(show))
         update(id) { $0.title = String(title.prefix(300)); $0.show = String(show.prefix(100)); $0.manualNames = true; $0.folder = folder }
     }
 
@@ -195,14 +230,19 @@ final class LibraryStore: ObservableObject {
             update(existing.id) { $0.aliases = Array(Set(aliases)) }
             entry = self.entry(existing.id)!
         }
-        let show = entry.manualNames ? entry.show : result.show
-        let folder = entry.manualFolder ? entry.folder : addFolder(show)
+        let resolvedShow = result.show.isEmpty ? entry.show : result.show
+        let show = entry.manualNames ? entry.show : resolvedShow
+        let match = PodcastFolderMatch.folder(for: show, folders: data.folders)
+        let ambiguous = match == nil && data.folders.contains { PodcastFolderMatch.folder(for: show, folders: [$0]) != nil }
+        let folder = entry.manualFolder ? entry.folder : (match ?? (ambiguous ? nil : addFolder(show)))
+        let resolvedTitle = PodcastFolderMatch.filename(result.title, folders: data.folders)?.title ?? result.title
+        let canonicalShow = PodcastFolderMatch.folder(for: resolvedShow, folders: data.folders) ?? resolvedShow
         update(entry.id) {
-            $0.source = result.source
+            if $0.localFilename == nil { $0.source = result.source }
             $0.isFeed = !result.episodes.isEmpty
             if !$0.manualNames {
-                if !result.title.isEmpty { $0.title = result.title }
-                $0.show = result.show
+                if !result.title.isEmpty { $0.title = resolvedTitle }
+                $0.show = canonicalShow
             }
             $0.folder = folder
         }
@@ -304,13 +344,34 @@ final class LibraryStore: ObservableObject {
     }
     func exportData() throws -> Data { try JSONEncoder().encode(data) }
     func restore(_ bytes: Data) throws {
-        var incoming = try JSONDecoder().decode(LibraryData.self, from: bytes)
+        let portable = try? JSONDecoder().decode(AudioLibraryBackup.self, from: bytes)
+        var incoming = try portable?.library ?? JSONDecoder().decode(LibraryData.self, from: bytes)
         guard incoming.version == 1,
               Set(incoming.entries.map(\.id)).count == incoming.entries.count,
               incoming.entries.allSatisfy({ ($0.localFilename == nil || Self.validLocalName($0.localFilename)) && (Self.webURL($0.url.absoluteString) != nil || Self.validLocalName($0.localFilename)) && ($0.source == nil || Self.webURL($0.source!.absoluteString) != nil) && ($0.duration == nil || ($0.duration!.isFinite && $0.duration! > 0)) && $0.position.isFinite && $0.position >= 0 && ($0.scrubReturnPosition == nil || ($0.scrubReturnPosition!.isFinite && $0.scrubReturnPosition! >= 0)) }) else { throw LibraryError.unsupported }
         incoming.folders = Array(Set(incoming.folders)).sorted()
         for i in incoming.entries.indices where !incoming.folders.contains(incoming.entries[i].folder ?? "") {
             incoming.entries[i].folder = nil
+        }
+        if let portable {
+            let names = Set(incoming.entries.compactMap(\.localFilename))
+            guard Set(portable.audioFiles.keys) == names, names.allSatisfy({ Self.validLocalName($0) }) else { throw LibraryError.unsupported }
+            try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
+            var restoredNames: [String: String] = [:]
+            for (name, contents) in portable.audioFiles {
+                var target = audioDirectory.appendingPathComponent(name)
+                if FileManager.default.fileExists(atPath: target.path), try Data(contentsOf: target) != contents {
+                    target = audioDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(target.pathExtension)
+                }
+                if !FileManager.default.fileExists(atPath: target.path) { try contents.write(to: target, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]) }
+                restoredNames[name] = target.lastPathComponent
+            }
+            for index in incoming.entries.indices {
+                if let name = incoming.entries[index].localFilename, let restored = restoredNames[name] {
+                    incoming.entries[index].localFilename = restored
+                    incoming.entries[index].url = audioDirectory.appendingPathComponent(restored)
+                }
+            }
         }
         // Persist first: a failed restore must not replace the in-memory library.
         try write(try JSONEncoder().encode(incoming))

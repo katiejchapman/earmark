@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 
 struct ResolvedAudio {
     var source: URL?
@@ -13,6 +14,43 @@ struct ResolvedEpisode {
     var page: URL?
 }
 
+enum PodcastFolderMatch {
+    private static func key(_ value: String) -> String {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !["", "the", "podcast", "official"].contains($0) }.joined(separator: " ")
+    }
+    static func folder(for show: String, folders: [String]) -> String? {
+        let raw = show.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return nil }
+        if let exact = folders.first(where: { $0.caseInsensitiveCompare(raw) == .orderedSame }) { return exact }
+        let candidate = key(raw)
+        guard !candidate.isEmpty else { return nil }
+        let exact = folders.filter { key($0) == candidate }
+        if exact.count == 1 { return exact[0] }
+        guard exact.isEmpty, candidate.count >= 5 else { return nil }
+        func similarity(_ other: String) -> Double {
+            let a = Array(candidate), b = Array(key(other))
+            guard b.count >= 5, abs(a.count - b.count) <= max(1, a.count / 8) else { return 0 }
+            var row = Array(0...b.count)
+            for i in a.indices {
+                var next = [i + 1] + Array(repeating: 0, count: b.count)
+                for j in b.indices { next[j + 1] = min(next[j] + 1, row[j + 1] + 1, row[j] + (a[i] == b[j] ? 0 : 1)) }
+                row = next
+            }
+            return 1 - Double(row[b.count]) / Double(max(a.count, b.count))
+        }
+        let ranked = folders.map { ($0, similarity($0)) }.sorted { $0.1 > $1.1 }
+        guard let best = ranked.first, best.1 >= 0.88, ranked.count == 1 || best.1 - ranked[1].1 >= 0.07 else { return nil }
+        return best.0
+    }
+    static func filename(_ title: String, folders: [String]) -> (folder: String, title: String)? {
+        guard let separator = title.range(of: "\\s+[-–—]\\s+", options: .regularExpression),
+              let folder = folder(for: String(title[..<separator.lowerBound]), folders: folders) else { return nil }
+        let episode = String(title[separator.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return episode.isEmpty ? nil : (folder, episode)
+    }
+}
+
 struct AudioResolver {
     enum Failure: LocalizedError {
         case unavailable, noAudio
@@ -23,6 +61,23 @@ struct AudioResolver {
             }
         }
     }
+    static func metadata(_ asset: AVAsset, fallback: String, folders: [String]) async -> (title: String?, show: String?) {
+        guard let items = try? await asset.load(.commonMetadata) else { return (nil, nil) }
+        var title: String?, album: String?, artist: String?
+        for item in items {
+            guard let text = try? await item.load(.stringValue), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+            switch item.commonKey {
+            case .commonKeyTitle: title = text
+            case .commonKeyAlbumName: album = text
+            case .commonKeyArtist: artist = text
+            default: break
+            }
+        }
+        let show = album ?? artist.flatMap { PodcastFolderMatch.folder(for: $0, folders: folders) }
+        if let inferred = PodcastFolderMatch.filename(title ?? fallback, folders: folders) { return (inferred.title, show ?? inferred.folder) }
+        return (title, show)
+    }
+
     private let extensions = ["mp3", "m4a", "aac", "wav", "flac", "ogg", "mp4"]
     func resolve(_ url: URL) async throws -> ResolvedAudio {
         let archive = url.host == "archive.org" || (url.host?.hasSuffix(".archive.org") ?? false)

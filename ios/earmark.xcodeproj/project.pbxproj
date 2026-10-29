@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0176114E775942BB4C887B7C /* EarmarkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06FD07F81F83183CE0A6BCD /* EarmarkUITests.swift */; };
+		0997197B7DEB49BD0D342176 /* AutomaticBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9333E37F9F6EDA4FDF144D8F /* AutomaticBackup.swift */; };
 		15DA9A6861F95F10CC18A86A /* EarmarkWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B725BC0AEE24B5D732602CDF /* EarmarkWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		16AF69893763F8FE276509F2 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9071F13467C50CB7AA90C740 /* Player.swift */; };
 		17B60E163F16BD60B23CF8A0 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = D18C9390AEDEF5CFEF887E6F /* Library.swift */; };
@@ -86,6 +87,7 @@
 		73AB2F9A7FD6D4E00B5D2129 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8C9B6BC4C53AC09EB05416F1 /* StickerStudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerStudio.swift; sourceTree = "<group>"; };
 		9071F13467C50CB7AA90C740 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		9333E37F9F6EDA4FDF144D8F /* AutomaticBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticBackup.swift; sourceTree = "<group>"; };
 		9A6CF232855F8F176BCB65B6 /* EarmarkWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarmarkWidget.swift; sourceTree = "<group>"; };
 		A6E19BF574A50697FE208E34 /* StickerSheetIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StickerSheetIcon.swift; sourceTree = "<group>"; };
 		B725BC0AEE24B5D732602CDF /* EarmarkWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = EarmarkWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -143,6 +145,7 @@
 			children = (
 				73AB2F9A7FD6D4E00B5D2129 /* Assets.xcassets */,
 				C6286B220E55F8CFE860BD31 /* AudioResolver.swift */,
+				9333E37F9F6EDA4FDF144D8F /* AutomaticBackup.swift */,
 				BEA1D577D80347A5AD68E01F /* ContentView.swift */,
 				C146B56CBC9B9C5DAA1CCA3E /* Earmark.entitlements */,
 				2A80942B9233519CB8A4CCCE /* EarmarkApp.swift */,
@@ -362,6 +365,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FEFCD8383220AD8EFD461247 /* AudioResolver.swift in Sources */,
+				0997197B7DEB49BD0D342176 /* AutomaticBackup.swift in Sources */,
 				3B333D8E798D0EF50DADC5B6 /* ContentView.swift in Sources */,
 				FF5B7CD21EBC09DE26D40545 /* EarmarkApp.swift in Sources */,
 				17B60E163F16BD60B23CF8A0 /* Library.swift in Sources */,

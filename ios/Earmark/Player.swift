@@ -8,6 +8,29 @@ struct ScrubNotch: Identifiable {
     let expiresAt: Date
 }
 
+// Only actual playback contributes to the five-second return-point threshold.
+struct ListeningDwell {
+    private var started: Double?
+    private(set) var accumulated: Double = 0
+    mutating func setPlaying(_ playing: Bool, now: Double = ProcessInfo.processInfo.systemUptime) {
+        if let started { accumulated += max(0, now - started) }
+        started = playing ? now : nil
+    }
+    mutating func reset() { started = nil; accumulated = 0 }
+    var eligible: Bool { accumulated >= 5 }
+}
+
+enum ScrubTrack {
+    static func target(x: Double, width: Double, duration: Double, notches: [Double]) -> (time: Double, notch: Double?) {
+        guard width > 16, duration > 0 else { return (0, nil) }
+        let span = width - 16
+        let valid = notches.filter { $0.isFinite && (0...duration).contains($0) }
+        if let nearest = valid.min(by: { abs(8 + span * $0 / duration - x) < abs(8 + span * $1 / duration - x) }),
+           abs(8 + span * nearest / duration - x) <= 9 { return (nearest, nearest) }
+        return (max(0, min(1, (x - 8) / span)) * duration, nil)
+    }
+}
+
 @MainActor
 final class AudioPlayer: ObservableObject {
     @Published private(set) var currentID: UUID?
@@ -35,6 +58,8 @@ final class AudioPlayer: ObservableObject {
     @Published private(set) var sleepRemaining: Double = 0
     @Published private(set) var scrubNotches: [ScrubNotch] = []
     private var notchTask: Task<Void, Never>?
+    private var listeningDwell = ListeningDwell()
+    @Published private(set) var widgetSleepChoosing = false
     var visibleScrubReturnPosition: Double? { scrubNotches.first?.position }
     func clearScrubReturn() {
         scrubNotches = []; notchTask?.cancel(); notchTask = nil
@@ -108,6 +133,7 @@ final class AudioPlayer: ObservableObject {
             let waiting = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                self.listeningDwell.setPlaying(isPlaying && self.wantsPlayback && !self.restoring)
                 self.playing = isPlaying
                 self.syncSleepCountdown()
                 if !self.restoring { self.loading = waiting }
@@ -154,6 +180,7 @@ final class AudioPlayer: ObservableObject {
 
     func load(_ entry: Recording, autoplay: Bool = false, refresh: Bool = false) {
         pauseSleepCountdown()
+        listeningDwell.reset()
         clearScrubReturn()
         savePosition(); player.pause(); loadTask?.cancel()
         status = nil; player.replaceCurrentItem(with: nil)
@@ -210,6 +237,15 @@ final class AudioPlayer: ObservableObject {
                     self.message = "error"
                 } else if item.status == .readyToPlay {
                     self.status = nil
+                    if let id = self.currentID, let entry = self.store.entry(id) {
+                        Task { [weak self] in
+                            let metadata = await AudioResolver.metadata(item.asset, fallback: entry.title, folders: self?.store.data.folders ?? [])
+                            guard let self, self.generation == token, self.currentID == id,
+                                  metadata.title != nil || metadata.show != nil else { return }
+                            self.store.apply(ResolvedAudio(source: entry.source ?? url, title: metadata.title ?? entry.title, show: metadata.show ?? entry.show), to: id)
+                            self.updateNowPlaying()
+                        }
+                    }
                     let seconds = item.duration.seconds
                     self.duration = seconds.isFinite ? seconds : 0
                     if let id = self.currentID { self.store.setDuration(self.duration, for: id) }
@@ -248,8 +284,9 @@ final class AudioPlayer: ObservableObject {
             player.play()
         } catch { wantsPlayback = false; message = "error" }
     }
-    func pause() { wantsPlayback = false; pauseSleepCountdown(); player.pause(); savePosition(); updateNowPlaying() }
+    func pause() { listeningDwell.setPlaying(false); wantsPlayback = false; pauseSleepCountdown(); player.pause(); savePosition(); updateNowPlaying() }
     func stop() {
+        listeningDwell.reset()
         clearScrubReturn()
         cancelSleepTimer()
         savePosition(); loadTask?.cancel(); generation = UUID(); status = nil
@@ -268,16 +305,20 @@ final class AudioPlayer: ObservableObject {
         guard !loading, duration > 0 else { return }
         let target = max(0, min(duration, seconds)); let token = generation
         let request = UUID(); seekGeneration = request
+        listeningDwell.setPlaying(false)
         if let id = currentID {
-            if rememberPrevious && abs(target - position) >= 1 { rememberScrub(position) }
+            if rememberPrevious && listeningDwell.eligible && abs(target - position) >= 1 { rememberScrub(position) }
             // Persist the intended destination before an asynchronous seek can be interrupted.
             store.setPosition(target, for: id)
         }
+        listeningDwell.reset()
         restoring = true; position = target
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token, self.seekGeneration == request else { return }
-                self.restoring = false; self.savePosition(); self.updateNowPlaying()
+                self.restoring = false
+                self.listeningDwell.setPlaying(self.player.timeControlStatus == .playing && self.wantsPlayback)
+                self.savePosition(); self.updateNowPlaying()
             }
         }
     }
@@ -316,6 +357,12 @@ final class AudioPlayer: ObservableObject {
             let offset: Double = action == "back" ? -15 : 15
             if loading { pendingWidgetSkip = offset }
             else { skip(offset) }
+        case "sleep-options": widgetSleepChoosing.toggle(); publishWidget()
+        case "sleep-5", "sleep-15", "sleep-30":
+            widgetSleepChoosing = false
+            let minutes = Double(action.replacingOccurrences(of: "sleep-", with: "")) ?? 5
+            setSleepTimer(seconds: minutes * 60)
+        case "sleep-cancel": widgetSleepChoosing = false; cancelSleepTimer()
         case "reset": reset()
         default: restoreLast()
         }
@@ -325,7 +372,7 @@ final class AudioPlayer: ObservableObject {
     func publishWidget() {
         WidgetBridge.publish(WidgetSnapshot(title: current?.title ?? "earmark", folder: current.map { $0.folder ?? "inbox" } ?? "",
             position: position, duration: duration > 0 ? duration : (current?.duration ?? 0), playing: playing, loaded: currentID != nil,
-            dark: UserDefaults.standard.object(forKey: "darkMode") as? Bool ?? true, updated: Date(), sleepDeadline: sleepDeadline, sleepRemaining: sleepRemaining, decorations: widgetDecorations?() ?? .empty))
+            dark: UserDefaults.standard.object(forKey: "darkMode") as? Bool ?? true, updated: Date(), sleepDeadline: sleepDeadline, sleepRemaining: sleepRemaining, sleepChoosing: widgetSleepChoosing, decorations: widgetDecorations?() ?? .empty))
     }
     func updateNowPlaying() {
         publishWidget()

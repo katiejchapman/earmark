@@ -35,6 +35,8 @@ struct ContentView: View {
     @State private var folder = ""
     @State private var editing: Recording?
     @State private var exporting = false
+    @State private var showingAutoBackup = false
+    @EnvironmentObject private var autoBackup: AutomaticBackupStore
     @State private var importing = false
     @State private var importingAudio = false
     @State private var sourceIsFile = false
@@ -106,6 +108,7 @@ struct ContentView: View {
         .onChange(of: studio.error) { _, error in if let error { notice = error } }
         .tint(rose)
         .font(AppType.font(.body))
+        .sheet(isPresented: $showingAutoBackup) { AutomaticBackupSettings(backup: autoBackup, savePosition: player.savePosition) }
         .sheet(item: $editing) { entry in
             NameEditor(entry: entry, folders: store.data.folders) { title, folder in
                 store.rename(entry.id, title: title, show: entry.show)
@@ -378,10 +381,10 @@ struct ContentView: View {
                         .frame(height: 44)
                 }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityLabel("Decorate stereo")
                     .accessibilityIdentifier("decorateStereo").protectedStereo("decorate")
-            }.frame(height: 70)
+            }.frame(height: 88, alignment: .bottom)
 
         }
-        .padding(20)
+        .padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 12)
         .background(LinearGradient(colors: metal, startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 30))
         .overlay(RoundedRectangle(cornerRadius: 30).strokeBorder(Color.gray.opacity(0.8)))
         .background(GeometryReader { geometry in Color.clear.preference(key: StudioFramesKey.self, value: ["stereo": geometry.frame(in: .global)]) })
@@ -433,8 +436,12 @@ struct ContentView: View {
                     Image(systemName: "plus").frame(width: 44, height: 44)
                 }.accessibilityLabel("Create folder")
                 Menu {
-                    Button(newestFirst ? "Date added: newest first ✓" : "Date added: newest first") { newestFirst = true }
-                    Button(!newestFirst ? "Date added: oldest first ✓" : "Date added: oldest first") { newestFirst = false }
+                    Button(newestFirst ? "Newest first ✓" : "Newest first") { newestFirst = true }
+                    Button(!newestFirst ? "Oldest first ✓" : "Oldest first") { newestFirst = false }
+                } label: { Image(systemName: "arrow.up.arrow.down").frame(width: 36, height: 44) }
+                    .accessibilityLabel("Sort by date added").accessibilityIdentifier("archiveSort")
+                Menu {
+                    Button("Automatic backups", systemImage: "icloud.and.arrow.up") { showingAutoBackup = true }
                     Button("Export library", systemImage: "square.and.arrow.up") {
                         do { player.savePosition(); backup = LibraryDocument(data: try store.exportData()); exporting = true }
                         catch { notice = error.localizedDescription }
@@ -576,13 +583,16 @@ struct ContentView: View {
                                     .foregroundStyle(.secondary).frame(minWidth: 24, alignment: .trailing)
                             }.accessibilityHidden(true)
                         }
-                        if let added = entry.addedAt {
-                            Text(added, format: .dateTime.month(.abbreviated).day().year()).font(AppType.fixed(9)).foregroundStyle(.secondary).lineLimit(1)
-                        }
                         }
                     }
-                    Text(showFolder ? (entry.folder ?? "inbox") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
-                        .font(AppType.font(.caption1)).foregroundStyle(.secondary)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(showFolder ? (entry.folder ?? "inbox") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
+                            .font(AppType.font(.caption1)).lineLimit(1)
+                        Spacer(minLength: 0)
+                        if let added = entry.addedAt {
+                            Text(added, format: .dateTime.month(.abbreviated).day().year()).font(AppType.fixed(9)).lineLimit(1).fixedSize()
+                        }
+                    }.foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
                 if entry.listened == true {
@@ -719,18 +729,23 @@ private struct SilverScrubber: View {
     let onReturn: (Double) -> Void
     let onEnd: () -> Void
     private var fraction: Double { min(1, max(0, value / max(1, duration))) }
+    @State private var snapped: Double?
 
     var body: some View {
         GeometryReader { geometry in
             let width = max(1, geometry.size.width - 16)
             ZStack(alignment: .leading) {
-                Capsule().fill(Color(hex: 0x8f988b)).frame(height: 4)
+                Capsule().fill(Color(hex: 0x8f988b)).frame(height: 6)
                     .overlay(alignment: .bottom) { Capsule().fill(.white.opacity(0.45)).frame(height: 1).offset(y: 1) }
-                Capsule().fill(Color(hex: 0xb85280)).frame(width: 8 + width * fraction, height: 4)
+                Capsule().fill(Color(hex: 0xb85280)).frame(width: 8 + width * fraction, height: 6)
                 ForEach(Array(savedPositions.enumerated()), id: \.offset) { _, saved in
-                    Rectangle().fill(Color.black.opacity(0.65)).frame(width: 2, height: 4)
-                        .overlay(alignment: .trailing) { Rectangle().fill(.white.opacity(0.55)).frame(width: 0.5) }
-                        .offset(x: min(geometry.size.width - 2, max(0, 7 + width * min(1, max(0, saved / duration)))))
+                    let ratio = CGFloat(min(1.0, max(0.0, saved / max(1.0, duration))))
+                    let notchX = min(geometry.size.width - 6.0, max(0.0, 5.0 + width * ratio))
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(LinearGradient(colors: [Color.black.opacity(0.8), Color.black.opacity(0.25), Color.white.opacity(0.5)], startPoint: .leading, endPoint: .trailing))
+                        .overlay(RoundedRectangle(cornerRadius: 1).strokeBorder(.black.opacity(0.35), lineWidth: 0.5))
+                        .frame(width: 6, height: 6)
+                        .offset(x: notchX)
                         .accessibilityHidden(true)
                 }
                 Circle().fill(RadialGradient(colors: [Color.white, Color(hex: 0xdce0df), Color(hex: 0xaeb5b7), Color(hex: 0x737c80)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 12))
@@ -741,15 +756,14 @@ private struct SilverScrubber: View {
             .frame(height: 24).contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { gesture in
                 guard enabled else { return }
-                if savedPositions.contains(where: { abs(gesture.startLocation.x - (8 + width * $0 / max(1, duration))) < 8 }),
-                   hypot(gesture.translation.width, gesture.translation.height) < 6 { return }
-                value = min(1, max(0, (gesture.location.x - 8) / width)) * duration
+                let target = ScrubTrack.target(x: gesture.location.x, width: geometry.size.width, duration: duration, notches: savedPositions)
+                if target.notch != snapped, target.notch != nil { UISelectionFeedbackGenerator().selectionChanged() }
+                snapped = target.notch; value = target.time
             }.onEnded { gesture in
                 guard enabled else { return }
-                if let saved = savedPositions.min(by: { abs(gesture.startLocation.x - (8 + width * $0 / max(1, duration))) < abs(gesture.startLocation.x - (8 + width * $1 / max(1, duration))) }),
-                   abs(gesture.startLocation.x - (8 + width * saved / max(1, duration))) < 8,
-                   hypot(gesture.translation.width, gesture.translation.height) < 6 { onReturn(saved) }
-                else { onEnd() }
+                let target = ScrubTrack.target(x: gesture.location.x, width: geometry.size.width, duration: duration, notches: savedPositions)
+                value = target.time; snapped = nil
+                if let notch = target.notch { onReturn(notch) } else { onEnd() }
             })
         }
         .frame(height: 24)

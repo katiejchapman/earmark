@@ -53,7 +53,8 @@ final class LibraryTests: XCTestCase {
         for small in [true, false] {
             let size = CGSize(width: small ? 178 : 360, height: 178)
             let layout = WidgetStereoLayout(size: size, small: small)
-            XCTAssertEqual(layout.jewels, .zero)
+            XCTAssertEqual(layout.jewels.height, 8)
+            XCTAssertGreaterThanOrEqual(layout.controls.height, 38)
             XCTAssertEqual(layout.decoration, .zero)
             XCTAssertGreaterThanOrEqual(layout.time.height, 23)
             XCTAssertGreaterThanOrEqual(layout.lcd.height, 24)
@@ -368,6 +369,122 @@ final class LibraryTests: XCTestCase {
         XCTAssertNotNil(reopened.entry(first.id)?.addedAt)
     }
 
+    func testPodcastFoldersMatchConservativelyAndSplitEpisodeFilename() {
+        let folders = ["Our Struggle", "Books", "Other Show"]
+        let identity = PodcastFolderMatch.filename("Our Struggle - Live from Family Brooklyn (ft. Willy Staley)", folders: folders)
+        XCTAssertEqual(identity?.folder, "Our Struggle")
+        XCTAssertEqual(identity?.title, "Live from Family Brooklyn (ft. Willy Staley)")
+        XCTAssertEqual(PodcastFolderMatch.folder(for: "Our Strugle Podcast", folders: folders), "Our Struggle")
+        XCTAssertEqual(PodcastFolderMatch.folder(for: "OUR STRUGGLE!", folders: folders), "Our Struggle")
+        XCTAssertNil(PodcastFolderMatch.filename("Struggling with books - An episode", folders: folders))
+        XCTAssertNil(PodcastFolderMatch.folder(for: "Our Strugle", folders: ["Our Struggle", "Our Struglee"]))
+    }
+    @MainActor func testMislabeledPodcastImportReusesFolderAndPreservesManualChoices() throws {
+        let file = temporaryFile(), parent = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let sample = parent.appendingPathComponent("Our Struggle - Live from Family Brooklyn (ft. Willy Staley).mp3")
+        var header = Data([0, 0, 0, 28]); header.append(Data("ftypM4A ".utf8)); header.append(Data(repeating: 0, count: 20))
+        try header.write(to: sample)
+        let store = LibraryStore(file: file); _ = store.addFolder("Our Struggle")
+        let imported = try store.importAudio(sample)
+        XCTAssertEqual(imported.folder, "Our Struggle")
+        XCTAssertEqual(imported.title, "Live from Family Brooklyn (ft. Willy Staley)")
+        XCTAssertEqual(store.playbackURL(for: imported)?.pathExtension, "m4a")
+        XCTAssertEqual(store.data.folders, ["Our Struggle"])
+        store.rename(imported.id, title: "My title", show: "Our Struggle")
+        _ = store.addFolder("Chosen"); store.move(imported.id, to: "Chosen")
+        _ = store.apply(ResolvedAudio(title: "Metadata title", show: "Our Strugle"), to: imported.id)
+        XCTAssertEqual(store.entry(imported.id)?.title, "My title")
+        XCTAssertEqual(store.entry(imported.id)?.folder, "Chosen")
+        XCTAssertNil(store.entry(imported.id)?.source)
+        XCTAssertEqual(try store.importAudio(sample).id, imported.id)
+        XCTAssertEqual(store.data.entries.count, 1)
+        let link = try store.remember("https://example.com/Our%20Struggle%20-%20Another%20Episode.mp3")
+        XCTAssertEqual(link.folder, "Our Struggle"); XCTAssertEqual(link.title, "Another Episode")
+        let resolved = store.apply(ResolvedAudio(source: link.url, title: "Our Struggle - Another Episode"), to: link.id)
+        XCTAssertEqual(resolved?.folder, "Our Struggle"); XCTAssertEqual(resolved?.title, "Another Episode")
+    }
+
+    func testNotchSnapUsesFullTrackAndReleasesBeyondKnobRadius() {
+        XCTAssertEqual(ScrubTrack.target(x: 8, width: 336, duration: 1000, notches: []).time, 0)
+        XCTAssertEqual(ScrubTrack.target(x: 328, width: 336, duration: 1000, notches: []).time, 1000)
+        let snapped = ScrubTrack.target(x: 173, width: 336, duration: 1000, notches: [0, 500, 1000])
+        XCTAssertEqual(snapped.time, 500); XCTAssertEqual(snapped.notch, 500)
+        let escaped = ScrubTrack.target(x: 180, width: 336, duration: 1000, notches: [500])
+        XCTAssertNil(escaped.notch); XCTAssertGreaterThan(escaped.time, 500)
+        XCTAssertEqual(ScrubTrack.target(x: 324, width: 336, duration: 1000, notches: [1000]).notch, 1000)
+    }
+    func testListeningDwellExcludesPausedTimeAndResetsAfterJump() {
+        var dwell = ListeningDwell()
+        dwell.setPlaying(true, now: 0); dwell.setPlaying(false, now: 3)
+        XCTAssertFalse(dwell.eligible)
+        dwell.setPlaying(false, now: 100)
+        XCTAssertEqual(dwell.accumulated, 3)
+        dwell.setPlaying(true, now: 100); dwell.setPlaying(false, now: 102)
+        XCTAssertTrue(dwell.eligible)
+        dwell.reset(); XCTAssertFalse(dwell.eligible)
+    }
+    @MainActor func testWidgetSleepIntentChoosesAndCancelsWithoutOpeningApp() async throws {
+        let previous = AudioPlayer.widgetInstance
+        defer { AudioPlayer.widgetInstance = previous }
+        let player = AudioPlayer(store: LibraryStore(file: temporaryFile()))
+        AudioPlayer.widgetInstance = player
+        XCTAssertFalse(StereoPlaybackIntent.openAppWhenRun)
+        _ = try await StereoPlaybackIntent(action: "sleep-options").perform()
+        XCTAssertTrue(player.widgetSleepChoosing)
+        for minutes in [5, 15, 30] {
+            _ = try await StereoPlaybackIntent(action: "sleep-\(minutes)").perform()
+            XCTAssertEqual(player.sleepRemaining, Double(minutes * 60))
+            XCTAssertNil(player.sleepDeadline)
+            XCTAssertFalse(player.widgetSleepChoosing)
+        }
+        _ = try await StereoPlaybackIntent(action: "sleep-cancel").perform()
+        XCTAssertFalse(player.sleepActive); XCTAssertFalse(player.widgetSleepChoosing)
+    }
+    @MainActor func testDailyPortableBackupsIncludeAudioAndPersistSchedule() async throws {
+        let suite = "earmark.backup." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let file = temporaryFile(), parent = file.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        let audio = parent.appendingPathComponent("sample.caf"), contents = Data("saved recording bytes".utf8)
+        try contents.write(to: audio)
+        let store = LibraryStore(file: file)
+        let entry = try store.importAudio(audio)
+        store.rename(entry.id, title: "Renamed audio", show: "")
+        store.setPosition(42, for: entry.id)
+        store.select(entry.id)
+        _ = try store.remember("https://example.com/backup.mp3")
+        let folder = parent.appendingPathComponent("CloudBackup")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let backup = AutomaticBackupStore(library: store, defaults: defaults)
+        try backup.choose(folder)
+        let now = Date()
+        await backup.runIfDue(now: now)
+        XCTAssertNil(backup.error); XCTAssertEqual(backup.lastSuccess, now)
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        XCTAssertEqual(files.count, 1)
+        let restored = LibraryStore(file: temporaryFile())
+        try restored.restore(Data(contentsOf: try XCTUnwrap(files.first)))
+        let imported = try XCTUnwrap(restored.entry(entry.id))
+        XCTAssertEqual(imported.title, "Renamed audio"); XCTAssertEqual(imported.position, 42)
+        XCTAssertEqual(try Data(contentsOf: try XCTUnwrap(restored.playbackURL(for: imported))), contents)
+        XCTAssertEqual(restored.data.lastID, entry.id); XCTAssertEqual(restored.data.entries.count, 2)
+        await backup.runIfDue(now: now.addingTimeInterval(3600))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).count, 1)
+        let reopened = AutomaticBackupStore(library: store, defaults: defaults)
+        XCTAssertTrue(reopened.configured); XCTAssertEqual(reopened.lastSuccess, now)
+        await reopened.runIfDue(now: now.addingTimeInterval(86401))
+        XCTAssertNil(reopened.error)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).count, 2)
+        reopened.enabled = false
+        await reopened.runIfDue(now: now.addingTimeInterval(172802))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: folder.path).count, 2)
+        let malformed = AudioLibraryBackup(library: store.data, audioFiles: ["../escape": contents])
+        XCTAssertThrowsError(try restored.restore(JSONEncoder().encode(malformed)))
+        XCTAssertEqual(restored.data.entries.count, 2)
+    }
+
     @MainActor func testLargeSeekCanReturnAndSleepPausesPlayback() async throws {
         let library = temporaryFile()
         let directory = library.deletingLastPathComponent()
@@ -389,35 +506,43 @@ final class LibraryTests: XCTestCase {
         for _ in 0..<100 where player.loading { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertNil(player.message)
         XCTAssertEqual(player.position, 12, accuracy: 0.2)
+        player.seek(40) // A paused jump alone does not qualify for a notch.
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertTrue(player.scrubNotches.isEmpty)
+        player.play()
+        for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
+        try await Task.sleep(for: .milliseconds(5200))
+        player.pause()
+        let firstMark = player.position
         player.seek(100)
-        // The new target is durable even before AVPlayer completes seeking.
         XCTAssertEqual(LibraryStore(file: library).entry(entry.id)?.position, 100)
-        XCTAssertEqual(store.entry(entry.id)?.scrubReturnPosition ?? -1, 12, accuracy: 0.2)
-        // A second scrub must work even before the first AVPlayer seek completes.
-        player.seek(175)
-        XCTAssertEqual(player.position, 175, accuracy: 0.2)
-        try await Task.sleep(for: .milliseconds(300))
-        XCTAssertEqual(store.entry(entry.id)?.scrubReturnPosition ?? -1, 12, accuracy: 0.2)
-        XCTAssertEqual(player.scrubNotches.count, 2)
-        XCTAssertEqual(player.scrubNotches[1].position, 100, accuracy: 0.2)
-        player.returnToSavedPosition(12)
-        try await Task.sleep(for: .milliseconds(300))
-        XCTAssertEqual(player.position, 12, accuracy: 0.2)
+        XCTAssertEqual(player.scrubNotches.first?.position ?? -1, firstMark, accuracy: 0.2)
+        player.seek(120) // No five seconds of listening between these jumps.
+        XCTAssertEqual(player.position, 120, accuracy: 0.2)
         XCTAssertEqual(player.scrubNotches.count, 1)
-        player.expireScrubNotches(now: Date().addingTimeInterval(31))
-        XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
-        player.skip(15)
         try await Task.sleep(for: .milliseconds(300))
-        XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
-        player.seek(120)
+        player.play()
+        for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
+        try await Task.sleep(for: .milliseconds(5200))
+        player.pause()
+        let secondMark = player.position
+        player.seek(175)
         try await Task.sleep(for: .milliseconds(300))
-        XCTAssertNotNil(player.visibleScrubReturnPosition)
+        XCTAssertEqual(player.scrubNotches.count, 2)
+        XCTAssertEqual(player.scrubNotches[1].position, secondMark, accuracy: 0.2)
+        player.returnToSavedPosition(firstMark)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(player.position, firstMark, accuracy: 0.2)
+        XCTAssertEqual(player.scrubNotches.count, 1)
         let expiry = try XCTUnwrap(player.scrubNotches.first?.expiresAt)
         player.expireScrubNotches(now: expiry.addingTimeInterval(-0.1))
         XCTAssertNotNil(player.visibleScrubReturnPosition)
         player.expireScrubNotches(now: expiry.addingTimeInterval(0.01))
         XCTAssertNil(player.visibleScrubReturnPosition)
         XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
+        player.skip(15)
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertTrue(player.scrubNotches.isEmpty)
         player.play()
         for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertTrue(player.playing)

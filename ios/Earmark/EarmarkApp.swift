@@ -5,6 +5,7 @@ struct EarmarkApp: App {
     @StateObject private var store: LibraryStore
     @StateObject private var player: AudioPlayer
     @StateObject private var studio: StickerStudioStore
+    @StateObject private var automaticBackup: AutomaticBackupStore
     @Environment(\.scenePhase) private var phase
     @AppStorage("darkMode") private var dark = true
     init() {
@@ -27,15 +28,27 @@ struct EarmarkApp: App {
         _store = StateObject(wrappedValue: store)
         _player = StateObject(wrappedValue: player)
         _studio = StateObject(wrappedValue: studio)
+        _automaticBackup = StateObject(wrappedValue: AutomaticBackupStore(library: store))
     }
     var body: some Scene {
         WindowGroup {
             ContentView(store: store, player: player, studio: studio)
+                .environmentObject(automaticBackup)
                 .preferredColorScheme(dark ? .dark : .light)
-                .task { player.restoreLast(); player.publishWidget() }
+                .task { player.restoreLast(); player.publishWidget(); await automaticBackup.runIfDue() }
+                .onChange(of: store.data.entries) { _, _ in
+                    guard phase == .active else { return }
+                    Task { await automaticBackup.runIfDue() }
+                }
+                .onReceive(Timer.publish(every: 3600, on: .main, in: .common).autoconnect()) { _ in
+                    if phase == .active { Task { await automaticBackup.runIfDue() } }
+                }
                 .onChange(of: studio.saved) { _, _ in player.publishWidget() }
                 .onChange(of: dark) { _, _ in player.publishWidget() }
-                .onChange(of: phase) { _, phase in if phase != .active { player.savePosition() } }
+                .onChange(of: phase) { _, phase in
+                    if phase != .active { player.savePosition() }
+                    else { Task { await automaticBackup.runIfDue() } }
+                }
         }
     }
 }

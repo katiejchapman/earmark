@@ -13,6 +13,7 @@ struct WidgetSnapshot: Codable, Equatable {
     var updated: Date
     var sleepDeadline: Date?
     var sleepRemaining: Double = 0
+    var sleepChoosing: Bool?
     var decorations: WidgetDecorations = .empty
     static var empty: Self { Self(title: "earmark", folder: "", position: 0, duration: 0, playing: false, loaded: false, dark: true, updated: Date()) }
     static var file: URL? {
@@ -92,12 +93,12 @@ struct WidgetStereoLayout {
     let footer: CGRect
     var protectedRects: [CGRect] { [jewels, lcd, time, controls, footer] }
     init(size: CGSize, small: Bool) {
-        inset = small ? 12 : 16; gap = small ? 5 : 6
-        let timeHeight = 23.0, controlsHeight = 30.0, footerHeight = 22.0
-        let lcdHeight = max(24, size.height - 22 - gap * 3 - timeHeight - controlsHeight - footerHeight)
+        inset = small ? 12 : 16; gap = small ? 4 : 5
+        let jewelHeight = 8.0, timeHeight = 23.0, controlsHeight = 38.0, footerHeight = 20.0
+        let lcdHeight = max(24, size.height - 22 - gap * 4 - jewelHeight - timeHeight - controlsHeight - footerHeight)
         let width = max(0, size.width - inset * 2)
-        jewels = .zero
-        lcd = CGRect(x: inset, y: 11, width: width, height: lcdHeight)
+        jewels = CGRect(x: inset, y: 11, width: width, height: jewelHeight)
+        lcd = CGRect(x: inset, y: jewels.maxY + gap, width: width, height: lcdHeight)
         time = CGRect(x: inset, y: lcd.maxY + gap, width: width, height: timeHeight)
         controls = CGRect(x: inset, y: time.maxY + gap, width: width, height: controlsHeight)
         decoration = .zero

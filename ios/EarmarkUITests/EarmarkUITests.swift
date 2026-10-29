@@ -23,6 +23,19 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Rename"].exists)
     }
 
+    @MainActor func testArchiveSortIsSeparateFromAutomaticBackupSettings() {
+        let app = testApp(); app.launch(); scrollArchive(app)
+        app.buttons["archiveSort"].tap()
+        let oldest = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Oldest first")).firstMatch
+        XCTAssertTrue(oldest.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["Export library"].exists)
+        oldest.tap()
+        app.buttons["Library options"].tap()
+        app.buttons["Automatic backups"].tap()
+        XCTAssertTrue(app.buttons["Choose iCloud Drive folder"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Done"].exists)
+    }
+
     @MainActor func testGlobalAndFolderListeningTabsShareStatus() {
         let app = testApp(); app.launch()
         let link = app.textFields["linkField"]
