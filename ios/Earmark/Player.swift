@@ -2,6 +2,12 @@ import AVFoundation
 import MediaPlayer
 import Combine
 
+struct ScrubNotch: Identifiable {
+    let id = UUID()
+    let position: Double
+    let expiresAt: Date
+}
+
 @MainActor
 final class AudioPlayer: ObservableObject {
     @Published private(set) var currentID: UUID?
@@ -19,6 +25,7 @@ final class AudioPlayer: ObservableObject {
     private var notifications: [NSObjectProtocol] = []
     private var loadTask: Task<Void, Never>?
     private var generation = UUID()
+    private var seekGeneration = UUID()
     private var restoring = false
     private var wantsPlayback = false
     private var interruptedPlayback = false
@@ -26,10 +33,30 @@ final class AudioPlayer: ObservableObject {
     private var source: URL?
     @Published private(set) var sleepDeadline: Date?
     @Published private(set) var sleepRemaining: Double = 0
-    var visibleScrubReturnPosition: Double? { current?.scrubReturnPosition }
-    // A saved notch persists until explicitly cleared or used, including across launches.
+    @Published private(set) var scrubNotches: [ScrubNotch] = []
+    private var notchTask: Task<Void, Never>?
+    var visibleScrubReturnPosition: Double? { scrubNotches.first?.position }
     func clearScrubReturn() {
+        scrubNotches = []; notchTask?.cancel(); notchTask = nil
         if let id = currentID { store.setScrubReturnPosition(nil, for: id) }
+    }
+    func expireScrubNotches(now: Date = Date()) {
+        scrubNotches.removeAll { $0.expiresAt <= now }
+        if let id = currentID { store.setScrubReturnPosition(scrubNotches.first?.position, for: id) }
+    }
+    private func rememberScrub(_ position: Double) {
+        expireScrubNotches()
+        scrubNotches.removeAll { abs($0.position - position) < 1 }
+        scrubNotches.append(ScrubNotch(position: position, expiresAt: Date().addingTimeInterval(30)))
+        if let id = currentID { store.setScrubReturnPosition(scrubNotches.first?.position, for: id) }
+        notchTask?.cancel()
+        notchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self, let next = self.scrubNotches.map(\.expiresAt).min() else { return }
+                do { try await Task.sleep(for: .seconds(max(0.01, next.timeIntervalSinceNow))) } catch { return }
+                self.expireScrubNotches()
+            }
+        }
     }
     private var sleepTask: Task<Void, Never>?
 
@@ -127,6 +154,7 @@ final class AudioPlayer: ObservableObject {
 
     func load(_ entry: Recording, autoplay: Bool = false, refresh: Bool = false) {
         pauseSleepCountdown()
+        clearScrubReturn()
         savePosition(); player.pause(); loadTask?.cancel()
         status = nil; player.replaceCurrentItem(with: nil)
         generation = UUID(); let token = generation
@@ -222,6 +250,7 @@ final class AudioPlayer: ObservableObject {
     }
     func pause() { wantsPlayback = false; pauseSleepCountdown(); player.pause(); savePosition(); updateNowPlaying() }
     func stop() {
+        clearScrubReturn()
         cancelSleepTimer()
         savePosition(); loadTask?.cancel(); generation = UUID(); status = nil
         player.pause(); player.replaceCurrentItem(with: nil)
@@ -236,29 +265,29 @@ final class AudioPlayer: ObservableObject {
         store.select(nil)
     }
     func seek(_ seconds: Double, rememberPrevious: Bool = true) {
-        guard !restoring, duration > 0 else { return }
+        guard !loading, duration > 0 else { return }
         let target = max(0, min(duration, seconds)); let token = generation
+        let request = UUID(); seekGeneration = request
         if let id = currentID {
-            if rememberPrevious && visibleScrubReturnPosition == nil && abs(target - position) >= 60 {
-                store.setScrubReturnPosition(position, for: id)
-            }
+            if rememberPrevious && abs(target - position) >= 1 { rememberScrub(position) }
             // Persist the intended destination before an asynchronous seek can be interrupted.
             store.setPosition(target, for: id)
         }
         restoring = true; position = target
         player.seek(to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, self.generation == token else { return }
+                guard let self, self.generation == token, self.seekGeneration == request else { return }
                 self.restoring = false; self.savePosition(); self.updateNowPlaying()
             }
         }
     }
-    func returnToSavedPosition() {
-        guard !restoring, duration > 0, let entry = current, let saved = visibleScrubReturnPosition else { return }
+    func returnToSavedPosition(_ position: Double? = nil) {
+        guard !loading, duration > 0, let saved = position ?? visibleScrubReturnPosition else { return }
         seek(saved, rememberPrevious: false)
-        store.setScrubReturnPosition(nil, for: entry.id)
+        scrubNotches.removeAll { abs($0.position - saved) < 1 }
+        if let id = currentID { store.setScrubReturnPosition(scrubNotches.first?.position, for: id) }
     }
-    func skip(_ seconds: Double) { seek(position + seconds) }
+    func skip(_ seconds: Double) { seek(position + seconds, rememberPrevious: false) }
     func savePosition() {
         guard !restoring, let id = currentID, player.currentItem?.status == .readyToPlay else { return }
         let seconds = player.currentTime().seconds

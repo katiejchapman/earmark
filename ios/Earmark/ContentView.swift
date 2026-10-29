@@ -329,8 +329,9 @@ struct ContentView: View {
             .overlay(RoundedRectangle(cornerRadius: 13).strokeBorder(LinearGradient(colors: [Color(hex: 0x383c40).opacity(0.8), Color(hex: 0x9a9f98).opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 5))
             .shadow(color: .white.opacity(dark ? 0.16 : 0.45), radius: 0, x: 0, y: 1)
             .protectedStereo("screen")
+            .padding(.horizontal, 18)
             VStack(spacing: 0) {
-                SilverScrubber(value: Binding(get: { scrub ?? player.position }, set: { scrub = $0 }), duration: player.duration, enabled: player.duration > 0 && !player.loading, savedPosition: player.visibleScrubReturnPosition, onReturn: { player.returnToSavedPosition(); scrub = nil }) {
+                SilverScrubber(value: Binding(get: { scrub ?? player.position }, set: { scrub = $0 }), duration: player.duration, enabled: player.duration > 0 && !player.loading, savedPositions: player.scrubNotches.map(\.position), onReturn: { player.returnToSavedPosition($0); scrub = nil }) {
                     if let scrub { player.seek(scrub) }; scrub = nil
                 }.protectedStereo("scrubber")
                 HStack {
@@ -342,9 +343,6 @@ struct ContentView: View {
                     }.buttonStyle(.plain).accessibilityLabel(remaining ? "Show total time" : "Show time remaining")
                 }.font(AppType.fixed(12)).monospacedDigit()
                     .protectedStereo("time")
-                if player.visibleScrubReturnPosition != nil {
-                    Button("clear notch") { player.clearScrubReturn() }.font(AppType.fixed(9)).accessibilityIdentifier("clearNotch")
-                }
                 HStack(spacing: 4) {
                     SleepControl(player: player, active: player.sleepActive, dark: dark).equatable().protectedStereo("sleep")
                     Spacer(minLength: 0)
@@ -361,27 +359,26 @@ struct ContentView: View {
                     }.buttonStyle(.plain).accessibilityIdentifier("resetPlayer").protectedStereo("reset")
                 }.padding(.top, -3)
             }
-            Color.clear.frame(height: 30)
+            Color.clear.frame(height: 36)
                 .background(GeometryReader { geometry in Color.clear.preference(key: StudioFramesKey.self, value: ["decoration": geometry.frame(in: .global)]) })
             HStack(spacing: 10) {
-                Group {
-                    if player.playing {
-                        Circle().fill(RadialGradient(colors: [Color(hex: 0xffd5cf), Color(hex: 0xff243d), Color(hex: 0x9a0020)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 7))
-                            .frame(width: 10, height: 10)
-                            .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1))
-                            .shadow(color: .red.opacity(0.85), radius: 5)
-                            .accessibilityLabel("Audio playing").accessibilityIdentifier("loadedLight")
-                    } else { Color.clear.frame(width: 10, height: 10).accessibilityHidden(true) }
-                }.frame(width: 28, height: 44).protectedStereo("light")
+                Circle().fill(RadialGradient(colors: player.playing ? [Color(hex: 0xffd5cf), Color(hex: 0xff243d), Color(hex: 0x9a0020)] : [Color(hex: 0x653039), Color(hex: 0x401c25), Color(hex: 0x29151c)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 7))
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1))
+                    .shadow(color: player.playing ? .red.opacity(0.85) : .clear, radius: 5)
+                    .accessibilityLabel(player.playing ? "Audio playing" : "Audio stopped")
+                    .accessibilityIdentifier("loadedLight").protectedStereo("light")
+                    .frame(width: 28, height: 44)
                 Speaker(dark: dark).frame(height: 22)
                     .protectedStereo("mesh").accessibilityIdentifier("speakerMesh").accessibilityHidden(true)
+                    .padding(.horizontal, 28)
                 Button { studio.editing ? studio.finish() : studio.begin() } label: {
                     StickerSheetIcon().frame(width: 23, height: 23)
                         .frame(width: 38, height: 30)
                         .frame(height: 44)
                 }.buttonStyle(.plain).foregroundStyle(.primary).accessibilityLabel("Decorate stereo")
                     .accessibilityIdentifier("decorateStereo").protectedStereo("decorate")
-            }
+            }.frame(height: 70)
 
         }
         .padding(20)
@@ -416,8 +413,7 @@ struct ContentView: View {
             }
                 .frame(width: size, height: size, alignment: .center)
                 .foregroundStyle(main ? Color(hex: 0x583346) : Color(hex: dark ? 0xfaf2f7 : 0x303831))
-                .background(Color(hex: main ? 0xdfa3bf : (dark ? 0x66656e : 0xd3d7ce)), in: Circle())
-                .shadow(color: .black.opacity(0.5), radius: 0.5, x: 0, y: 3)
+                .background(RadialGradient(colors: [Color(hex: main ? 0xe6afc9 : (dark ? 0x74737c : 0xe0e3dc)), Color(hex: main ? 0xdfa3bf : (dark ? 0x66656e : 0xd3d7ce)), Color(hex: main ? 0xd99bb8 : (dark ? 0x605f68 : 0xcbd0c7))], center: .init(x: 0.4, y: 0.3), startRadius: 0, endRadius: size), in: Circle())
                 .overlay(Circle().strokeBorder(Color(hex: main ? 0xb97998 : (dark ? 0x928693 : 0x858c82)), lineWidth: main ? 3 : 1))
         }.frame(height: 44).buttonStyle(.plain).accessibilityLabel(label).disabled(player.currentID == nil)
     }
@@ -569,6 +565,7 @@ struct ContentView: View {
                         Text(entry.title).font(AppType.font(.subheadline, weight: 600)).lineLimit(2)
                             .foregroundStyle(entry.listened == true ? Color(hex: dark ? 0x9fc8c2 : 0x49796f) : .primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .trailing, spacing: 4) {
                         if entry.listened != true && !entry.isFeed {
                             HStack(spacing: 5) {
                                 GeometryReader { geometry in
@@ -579,8 +576,11 @@ struct ContentView: View {
                                     .foregroundStyle(.secondary).frame(minWidth: 24, alignment: .trailing)
                             }.accessibilityHidden(true)
                         }
+                        if let added = entry.addedAt {
+                            Text(added, format: .dateTime.month(.abbreviated).day().year()).font(AppType.fixed(9)).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        }
                     }
-                    if let added = entry.addedAt { Text(added, format: .dateTime.month(.abbreviated).day().year()).font(AppType.font(.caption2)).foregroundStyle(.secondary) }
                     Text(showFolder ? (entry.folder ?? "inbox") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
                         .font(AppType.font(.caption1)).foregroundStyle(.secondary)
                 }
@@ -715,8 +715,8 @@ private struct SilverScrubber: View {
     @Binding var value: Double
     let duration: Double
     let enabled: Bool
-    let savedPosition: Double?
-    let onReturn: () -> Void
+    let savedPositions: [Double]
+    let onReturn: (Double) -> Void
     let onEnd: () -> Void
     private var fraction: Double { min(1, max(0, value / max(1, duration))) }
 
@@ -727,7 +727,7 @@ private struct SilverScrubber: View {
                 Capsule().fill(Color(hex: 0x8f988b)).frame(height: 4)
                     .overlay(alignment: .bottom) { Capsule().fill(.white.opacity(0.45)).frame(height: 1).offset(y: 1) }
                 Capsule().fill(Color(hex: 0xb85280)).frame(width: 8 + width * fraction, height: 4)
-                if let saved = savedPosition, duration > 0 {
+                ForEach(Array(savedPositions.enumerated()), id: \.offset) { _, saved in
                     Rectangle().fill(Color.black.opacity(0.65)).frame(width: 2, height: 4)
                         .overlay(alignment: .trailing) { Rectangle().fill(.white.opacity(0.55)).frame(width: 0.5) }
                         .offset(x: min(geometry.size.width - 2, max(0, 7 + width * min(1, max(0, saved / duration)))))
@@ -741,13 +741,14 @@ private struct SilverScrubber: View {
             .frame(height: 24).contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { gesture in
                 guard enabled else { return }
-                if let saved = savedPosition, abs(gesture.startLocation.x - (8 + width * saved / max(1, duration))) < 12,
+                if savedPositions.contains(where: { abs(gesture.startLocation.x - (8 + width * $0 / max(1, duration))) < 8 }),
                    hypot(gesture.translation.width, gesture.translation.height) < 6 { return }
                 value = min(1, max(0, (gesture.location.x - 8) / width)) * duration
             }.onEnded { gesture in
                 guard enabled else { return }
-                if let saved = savedPosition, abs(gesture.startLocation.x - (8 + width * saved / max(1, duration))) < 12,
-                   hypot(gesture.translation.width, gesture.translation.height) < 6 { onReturn() }
+                if let saved = savedPositions.min(by: { abs(gesture.startLocation.x - (8 + width * $0 / max(1, duration))) < abs(gesture.startLocation.x - (8 + width * $1 / max(1, duration))) }),
+                   abs(gesture.startLocation.x - (8 + width * saved / max(1, duration))) < 8,
+                   hypot(gesture.translation.width, gesture.translation.height) < 6 { onReturn(saved) }
                 else { onEnd() }
             })
         }
@@ -755,7 +756,7 @@ private struct SilverScrubber: View {
         .allowsHitTesting(enabled)
         .accessibilityElement().accessibilityLabel("Playback position")
         .accessibilityValue("\(ContentView.time(value)) of \(ContentView.time(duration))")
-        .accessibilityAction(named: "Return to saved position") { if savedPosition != nil { onReturn() } }
+        .accessibilityAction(named: "Return to saved position") { if let saved = savedPositions.first { onReturn(saved) } }
         .accessibilityAdjustableAction { direction in
             guard enabled else { return }
             value = min(duration, max(0, value + (direction == .increment ? 15 : -15)))

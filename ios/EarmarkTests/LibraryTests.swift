@@ -49,29 +49,18 @@ final class LibraryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(store.entry(entry.id)?.position ?? 0, 19.9)
     }
 
-    func testWidgetStickersKeepSavedDesignAndOmitProtectedOverlaps() {
+    func testSimplifiedWidgetLayoutFitsSmallAndMedium() {
         for small in [true, false] {
             let size = CGSize(width: small ? 178 : 360, height: 178)
             let layout = WidgetStereoLayout(size: size, small: small)
-            let safe = WidgetGem(id: UUID(), asset: "Gem_moon_blue", x: 0.25, y: layout.decoration.midY / size.height, size: 18, rotation: 17)
-            var onScreen = safe; onScreen.id = UUID(); onScreen.y = layout.lcd.midY / size.height
-            var offEdge = safe; offEdge.id = UUID(); offEdge.x = 0
-            var overlap = safe; overlap.id = UUID()
-            var tooLarge = safe; tooLarge.id = UUID(); tooLarge.x = 0.7; tooLarge.size = 120
-            let saved = WidgetDecorations(width: 362, height: 365, gems: [safe, onScreen, offEdge, overlap, tooLarge])
-            let visible = saved.visible(in: size, obstacles: layout.protectedRects)
-            XCTAssertEqual(visible.map(\.id), [safe.id])
-            XCTAssertEqual(visible.first?.asset, safe.asset)
-            XCTAssertEqual(visible.first?.rotation, safe.rotation)
-            XCTAssertLessThan(visible.first?.size ?? 100, safe.size)
-            XCTAssertEqual(saved.gems.count, 5) // Filtering never edits the saved app layout.
-            let larger = saved.widgetGems(in: size, band: layout.decoration)
-            XCTAssertEqual(larger.count, small ? 2 : 3)
-            for gem in larger {
-                XCTAssertTrue(layout.decoration.contains(gem.footprint(in: size)))
-                XCTAssertFalse(layout.protectedRects.contains { $0.intersects(gem.footprint(in: size)) })
-                XCTAssertGreaterThan(gem.size, 18 * min(size.width / 362, size.height / 365))
-            }
+            XCTAssertEqual(layout.jewels, .zero)
+            XCTAssertEqual(layout.decoration, .zero)
+            XCTAssertGreaterThanOrEqual(layout.time.height, 23)
+            XCTAssertGreaterThanOrEqual(layout.lcd.height, 24)
+            XCTAssertLessThanOrEqual(layout.footer.maxY, size.height - 10)
+            XCTAssertLessThan(layout.lcd.maxY, layout.time.minY)
+            XCTAssertLessThan(layout.time.maxY, layout.controls.minY)
+            XCTAssertLessThan(layout.controls.maxY, layout.footer.minY)
         }
         var state = WidgetSnapshot.empty
         let now = Date(); state.updated = now; state.position = 20; state.duration = 200; state.playing = true
@@ -257,6 +246,37 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(reopened.data.entries.count, 3)
     }
 
+    @MainActor func testHorizontalStickerSwipeDoesNotPickUpGemAndInvalidDropIsRejected() throws {
+        let studio = StickerStudioStore(file: temporaryFile()); studio.begin()
+        let view = StickerTouchView(frame: CGRect(x: 0, y: 0, width: 320, height: 600))
+        view.studio = studio
+        view.frames = ["stereo": CGRect(x: 0, y: 0, width: 320, height: 400), "protected-screen": CGRect(x: 40, y: 60, width: 240, height: 100)]
+        view.beginSourceSession(studio.choices[0], at: CGPoint(x: 180, y: 500))
+        view.moveActiveGesture(to: CGPoint(x: 70, y: 502))
+        XCTAssertFalse(view.isDraggingPreviewVisible)
+        view.endActiveGesture()
+        XCTAssertEqual(studio.page, 1)
+        XCTAssertEqual(studio.draft.count, 3)
+        view.beginSourceSession(studio.choices[0], at: CGPoint(x: 160, y: 500))
+        view.moveActiveGesture(to: CGPoint(x: 160, y: 100))
+        XCTAssertTrue(view.isDraggingPreviewVisible) // Free preview over the protected LCD.
+        view.endActiveGesture()
+        XCTAssertEqual(studio.draft.count, 3) // Release on LCD must not place it.
+        view.beginSourceSession(studio.choices[0], at: CGPoint(x: 160, y: 500))
+        view.moveActiveGesture(to: CGPoint(x: 160, y: 240)); view.endActiveGesture()
+        XCTAssertEqual(studio.draft.count, 4)
+    }
+
+    @MainActor func testStickersFitBesideNarrowScreenAndSpeaker() throws {
+        let studio = StickerStudioStore(file: temporaryFile()); studio.begin(); studio.draft = []
+        studio.updateLayout(stereo: CGRect(x: 0, y: 0, width: 320, height: 420), obstacles: [CGRect(x: 58, y: 40, width: 204, height: 100), CGRect(x: 120, y: 340, width: 80, height: 22)])
+        for point in [CGPoint(x: 30, y: 80), CGPoint(x: 290, y: 80), CGPoint(x: 90, y: 350), CGPoint(x: 230, y: 350)] {
+            let gem = PlacedGem(asset: GemChoice.all[0].id, x: point.x / 320, y: point.y / 420, size: 20)
+            XCTAssertTrue(studio.place(gem))
+        }
+        XCTAssertFalse(studio.place(PlacedGem(asset: GemChoice.all[0].id, x: 0.5, y: 350.0 / 420, size: 20)))
+    }
+
     @MainActor func testSourceGemCanBePinchedAndRotatedBeforeDrop() throws {
         let file = temporaryFile().deletingLastPathComponent().appendingPathComponent("decorations.json")
         let studio = StickerStudioStore(file: file); studio.begin()
@@ -373,13 +393,18 @@ final class LibraryTests: XCTestCase {
         // The new target is durable even before AVPlayer completes seeking.
         XCTAssertEqual(LibraryStore(file: library).entry(entry.id)?.position, 100)
         XCTAssertEqual(store.entry(entry.id)?.scrubReturnPosition ?? -1, 12, accuracy: 0.2)
-        try await Task.sleep(for: .milliseconds(300))
+        // A second scrub must work even before the first AVPlayer seek completes.
         player.seek(175)
+        XCTAssertEqual(player.position, 175, accuracy: 0.2)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(store.entry(entry.id)?.scrubReturnPosition ?? -1, 12, accuracy: 0.2)
-        player.returnToSavedPosition()
+        XCTAssertEqual(player.scrubNotches.count, 2)
+        XCTAssertEqual(player.scrubNotches[1].position, 100, accuracy: 0.2)
+        player.returnToSavedPosition(12)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertEqual(player.position, 12, accuracy: 0.2)
+        XCTAssertEqual(player.scrubNotches.count, 1)
+        player.expireScrubNotches(now: Date().addingTimeInterval(31))
         XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
         player.skip(15)
         try await Task.sleep(for: .milliseconds(300))
@@ -387,14 +412,12 @@ final class LibraryTests: XCTestCase {
         player.seek(120)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertNotNil(player.visibleScrubReturnPosition)
-        // Loading another item and returning must retain the saved notch.
-        player.stop()
-        player.restoreLast()
-        for _ in 0..<100 where player.loading { try await Task.sleep(for: .milliseconds(100)) }
+        let expiry = try XCTUnwrap(player.scrubNotches.first?.expiresAt)
+        player.expireScrubNotches(now: expiry.addingTimeInterval(-0.1))
         XCTAssertNotNil(player.visibleScrubReturnPosition)
-        XCTAssertNotNil(store.entry(entry.id)?.scrubReturnPosition)
-        player.clearScrubReturn()
+        player.expireScrubNotches(now: expiry.addingTimeInterval(0.01))
         XCTAssertNil(player.visibleScrubReturnPosition)
+        XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
         player.play()
         for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertTrue(player.playing)

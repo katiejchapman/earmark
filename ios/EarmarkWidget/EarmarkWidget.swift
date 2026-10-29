@@ -59,12 +59,6 @@ struct StereoWidgetView: View {
         GeometryReader { geometry in
             let layout = WidgetStereoLayout(size: geometry.size, small: small)
             VStack(spacing: layout.gap) {
-                HStack(spacing: 0) {
-                    ForEach(0..<11, id: \.self) { i in
-                        if i > 0 { Spacer(minLength: 1) }
-                        Image("RoundRhinestone").resizable().preserveWidgetColor().scaledToFit().frame(width: small ? 7 : 9, height: small ? 7 : 9)
-                    }
-                }.frame(height: layout.jewels.height).padding(.horizontal, small ? 5 : 22)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(state.title).font(.system(size: small ? 12 : 14, weight: .semibold, design: .monospaced)).lineLimit(1)
                     HStack(spacing: 3) {
@@ -92,25 +86,22 @@ struct StereoWidgetView: View {
                         let ratio = state.duration > 0 ? min(1, state.position(at: date) / state.duration) : 0
                         Capsule().fill(.black.opacity(0.4))
                         Image(uiImage: Self.progressPixel).resizable().preserveWidgetColor().frame(width: bar.size.width * ratio).clipShape(Capsule())
-                        Circle().fill(LinearGradient(colors: [.white, .gray], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .frame(width: 8, height: 8).offset(x: max(0, min(bar.size.width - 8, bar.size.width * ratio - 4)), y: -2)
-                    }.frame(height: 4)
+                    }.frame(height: 6)
                     HStack {
                         Text(time(state.position(at: date))); Spacer()
                         Text("−" + time(max(0, state.duration - state.position(at: date))))
-                    }.font(.system(size: 8, design: .monospaced)).monospacedDigit()
+                    }.font(.system(size: 9, design: .monospaced)).monospacedDigit()
                 }
                 .frame(height: layout.time.height)
                 HStack(spacing: 4) {
-                    auxiliary("sleep", action: "sleep"); Spacer(minLength: 0)
+                    Spacer(minLength: 0)
                     transport("«15", action: "back")
                     transport(state.playing ? "Ⅱ" : "▶", action: "toggle", main: true)
                     transport("15»", action: "forward")
                     Spacer(minLength: 0)
                 }.frame(height: layout.controls.height)
-                Color.clear.frame(height: layout.decoration.height)
                 HStack(spacing: 9) {
-                    Circle().fill(state.playing ? Color.red : .clear).frame(width: 6, height: 6)
+                    Circle().fill(state.playing ? Color.red : Color(red: 0.24, green: 0.08, blue: 0.11)).frame(width: 6, height: 6)
                         .shadow(color: state.playing ? .red.opacity(0.85) : .clear, radius: 3).frame(width: 14)
                     Canvas { context, size in
                         for x in stride(from: 1.0, to: size.width, by: 4) {
@@ -119,17 +110,12 @@ struct StereoWidgetView: View {
                             }
                         }
                     }.background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 5)).clipShape(RoundedRectangle(cornerRadius: 5))
+                    auxiliary("sleep", action: "sleep")
                 }.frame(height: layout.footer.height)
             }
             .padding(.horizontal, layout.inset).padding(.vertical, 11)
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .overlay {
-                ForEach(state.decorations.widgetGems(in: geometry.size, band: layout.decoration)) { gem in
-                    Image(gem.asset).resizable().preserveWidgetColor().scaledToFit().frame(width: gem.size, height: gem.size)
-                        .rotationEffect(.degrees(gem.rotation))
-                        .position(x: geometry.size.width * gem.x, y: geometry.size.height * gem.y)
-                }.allowsHitTesting(false)
-            }
+
         }
         .foregroundStyle(ink)
         .environment(\.colorScheme, state.dark ? .dark : .light)

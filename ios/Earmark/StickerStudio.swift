@@ -42,6 +42,7 @@ final class StickerStudioStore: ObservableObject {
     @Published var draft: [PlacedGem]
     @Published private(set) var editing = false
     @Published var page = 0
+    @Published var pageSwipe: Double = 0
     @Published var selectedID: UUID?
     @Published var activeID: UUID?
     @Published var error: String?
@@ -274,6 +275,8 @@ struct StickerSheet: View {
                 }
                 if studio.choices.count < 5 { ForEach(0..<(5 - studio.choices.count), id: \.self) { _ in Color.clear.frame(maxWidth: .infinity, minHeight: 60) } }
             }
+            .offset(x: studio.pageSwipe)
+            .clipped()
             .id(studio.page)
             .background(GeometryReader { geometry in Color.clear.preference(key: StudioFramesKey.self, value: ["sheet": geometry.frame(in: .global)]) })
             HStack(spacing: 7) {
@@ -439,19 +442,17 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
             else if gesture.state == .cancelled { complete(cancelled: true) }
             return
         }
-        if !current.directionChosen, hypot(delta.x, delta.y) > 6 {
-            current.directionChosen = true
-            if !current.existing, !current.transformed, abs(delta.x) > abs(delta.y) * 1.3 { current.paging = true }
-        }
+        chooseSourceDirection(&current, delta: delta)
         if !current.paging { current.center = CGPoint(x: current.panBase.x + delta.x, y: current.panBase.y + delta.y) }
         else { current.pageDelta = delta.x; current.center = gesture.location(in: self) }
+        if current.paging { studio?.pageSwipe = max(-70, min(70, delta.x * 0.35)) }
         session = current; paint()
         if gesture.state == .ended { endActiveGesture() }
         else if gesture.state == .cancelled || gesture.state == .failed { complete(cancelled: true) }
     }
     private func startTransform() {
         guard var current = session, !current.gem.asset.isEmpty else { return }
-        current.paging = false; current.transformed = true; current.panBase = current.center
+        current.paging = false; current.directionChosen = true; current.transformed = true; current.panBase = current.center
         current.origin = pan.location(in: self)
         pan.setTranslation(.zero, in: self); session = current
     }
@@ -475,7 +476,20 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         guard var current = session, !current.gem.asset.isEmpty else { return }
         current.gem.rotation = current.angleBase + angle * 180 / .pi; session = current; paint()
     }
-    func moveActiveGesture(to point: CGPoint) { session?.center = point; paint() }
+    private func chooseSourceDirection(_ current: inout Session, delta: CGPoint) {
+        guard !current.existing, !current.transformed, !current.directionChosen else { return }
+        if abs(delta.x) > 12, abs(delta.x) > abs(delta.y) * 1.1 { current.directionChosen = true; current.paging = true }
+        else if abs(delta.y) > 12, abs(delta.y) >= abs(delta.x) * 0.9 { current.directionChosen = true; current.paging = false }
+    }
+    func moveActiveGesture(to point: CGPoint) {
+        guard var current = session else { return }
+        let delta = CGPoint(x: point.x - current.origin.x, y: point.y - current.origin.y)
+        chooseSourceDirection(&current, delta: delta)
+        current.center = point; current.pageDelta = delta.x
+        session = current; paint()
+    }
+    var isDraggingPreviewVisible: Bool { !ghost.isHidden }
+
     func endActiveGesture() { complete(cancelled: false) }
     @objc private func pinched(_ gesture: UIPinchGestureRecognizer) {
         if gesture.state == .began { beginPinch() }
@@ -487,20 +501,15 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
     }
     private func paint() {
         guard var current = session, !current.paging, !current.gem.asset.isEmpty, let studio else { ghost.isHidden = true; return }
+        guard current.existing || current.transformed || current.directionChosen else { ghost.isHidden = true; return }
         studio.updateLayout(stereo: frames["stereo"], decoration: frames["decoration"], obstacles: frames.filter { $0.key.hasPrefix("protected-") }.map { $0.value })
         let overTrash = current.existing && local("trash")?.insetBy(dx: -8, dy: -8).contains(current.center) == true
         if let stereo = local("stereo"), !overTrash {
             var proposed = current.gem
             proposed.x = (current.center.x - stereo.minX) / stereo.width
             proposed.y = (current.center.y - stereo.minY) / stereo.height
-            if let previous = current.lastValid {
-                let safe = studio.limitedMotion(from: previous, to: proposed)
-                current.gem = safe; current.lastValid = safe
-                current.center = CGPoint(x: stereo.minX + safe.x * stereo.width, y: stereo.minY + safe.y * stereo.height)
-            } else if stereo.contains(current.center), let safe = studio.initialPlacement(proposed) {
-                current.gem = safe; current.lastValid = safe
-                current.center = CGPoint(x: stereo.minX + safe.x * stereo.width, y: stereo.minY + safe.y * stereo.height)
-            }
+            // The ghost follows the fingers freely; collision rules apply only on release.
+            current.gem = proposed
         }
         session = current
         ghost.isHidden = false; ghost.image = UIImage(named: current.gem.asset)
@@ -510,7 +519,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
     }
     private func complete(cancelled: Bool) {
         guard var current = session, let studio else { return }
-        defer { session = nil; ghost.isHidden = true; studio.activeID = nil; displayLink?.invalidate(); displayLink = nil }
+        defer { session = nil; ghost.isHidden = true; studio.activeID = nil; studio.pageSwipe = 0; displayLink?.invalidate(); displayLink = nil }
         guard !cancelled else { return }
         studio.updateLayout(stereo: frames["stereo"], decoration: frames["decoration"], obstacles: frames.filter { $0.key.hasPrefix("protected-") }.map { $0.value })
         if current.paging {
@@ -524,8 +533,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         guard let stereo = local("stereo"), stereo.contains(current.center) else { return }
         current.gem.x = (current.center.x - stereo.minX) / stereo.width
         current.gem.y = (current.center.y - stereo.minY) / stereo.height
-        current.gem.constrain(to: stereo.size)
-        studio.place(current.gem)
+        studio.place(current.gem) // Invalid drops leave an existing sticker in its original place.
     }
     private func findScrollView(_ view: UIView?) -> UIScrollView? {
         guard let view else { return nil }
@@ -534,7 +542,8 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         return nil
     }
     @objc private func autoScroll() {
-        guard let current = session, !current.paging, let scroll = scrolling else { return }
+        guard let current = session, !current.paging, let scroll = scrolling,
+              current.existing || current.transformed || current.directionChosen else { return }
         let speed: CGFloat = current.center.y < 55 ? -4 : (current.center.y > bounds.height - 55 ? 4 : 0)
         guard speed != 0 else { return }
         let minY = -scroll.adjustedContentInset.top

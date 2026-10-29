@@ -92,16 +92,15 @@ struct WidgetStereoLayout {
     let footer: CGRect
     var protectedRects: [CGRect] { [jewels, lcd, time, controls, footer] }
     init(size: CGSize, small: Bool) {
-        inset = small ? 12 : 16; gap = small ? 4 : 5
-        let jewelHeight = small ? 7.0 : 9.0, footerHeight = small ? 12.0 : 15.0
-        let bandHeight = 27.0, timeHeight = 17.0, controlsHeight = 30.0
-        let lcdHeight = max(24, size.height - 22 - gap * 5 - jewelHeight - timeHeight - controlsHeight - bandHeight - footerHeight)
+        inset = small ? 12 : 16; gap = small ? 5 : 6
+        let timeHeight = 23.0, controlsHeight = 30.0, footerHeight = 22.0
+        let lcdHeight = max(24, size.height - 22 - gap * 3 - timeHeight - controlsHeight - footerHeight)
         let width = max(0, size.width - inset * 2)
-        jewels = CGRect(x: inset, y: 11, width: width, height: jewelHeight)
-        lcd = CGRect(x: inset, y: jewels.maxY + gap, width: width, height: lcdHeight)
+        jewels = .zero
+        lcd = CGRect(x: inset, y: 11, width: width, height: lcdHeight)
         time = CGRect(x: inset, y: lcd.maxY + gap, width: width, height: timeHeight)
         controls = CGRect(x: inset, y: time.maxY + gap, width: width, height: controlsHeight)
-        decoration = CGRect(x: inset, y: controls.maxY + gap, width: width, height: bandHeight)
-        footer = CGRect(x: inset, y: decoration.maxY + gap, width: width, height: footerHeight)
+        decoration = .zero
+        footer = CGRect(x: inset, y: controls.maxY + gap, width: width, height: footerHeight)
     }
 }

@@ -93,7 +93,8 @@ final class EarmarkUITests: XCTestCase {
         field.tap(); field.typeText("https://example.com/archive-only.mp3")
         app.buttons["saveArchive"].tap()
         XCTAssertEqual(app.staticTexts["nowPlayingTitle"].label, "A little listening time")
-        XCTAssertFalse(app.otherElements["loadedLight"].exists)
+        XCTAssertTrue(app.otherElements["loadedLight"].exists)
+        XCTAssertEqual(app.otherElements["loadedLight"].label, "Audio stopped")
         scrollArchive(app)
         let row = app.buttons["Options for archive-only, inbox"]
         for _ in 0..<3 where !row.isHittable { scrollArchive(app) }
@@ -123,7 +124,8 @@ final class EarmarkUITests: XCTestCase {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "stickerSource-")).count, 5)
         let source = app.buttons["stickerSource-Gem_heart_green"]
         let target = app.otherElements["stereoPlayer"]
-        let destination = target.coordinate(withNormalizedOffset: CGVector(dx: 0.40, dy: 0.80))
+        // Use the free metal band; the lower 0.80 destination now intersects the mesh.
+        let destination = target.coordinate(withNormalizedOffset: CGVector(dx: 0.40, dy: 0.73))
         let dropPoint = destination.screenPoint
         source.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.3, thenDragTo: destination, withVelocity: .slow, thenHoldForDuration: 0.2)
         let placed = app.images["Placed heart green sticker"]
