@@ -23,6 +23,7 @@ struct Recording: Identifiable, Codable, Equatable {
     var aliases: [URL]?
     var listened: Bool?
     var scrubReturnPosition: Double?
+    var addedAt: Date? = Date()
 }
 
 struct LibraryData: Codable {
@@ -30,6 +31,7 @@ struct LibraryData: Codable {
     var entries: [Recording] = []
     var folders: [String] = []
     var lastID: UUID?
+    var queue: [UUID]?
 }
 
 @MainActor
@@ -187,6 +189,8 @@ final class LibraryStore: ObservableObject {
             // A page URL and its direct audio URL refer to one recording, in one folder.
             let aliases = (existing.aliases ?? []) + [entry.url] + (entry.aliases ?? [])
             data.entries.removeAll { $0.id == id }
+            var seen: Set<UUID> = []
+            data.queue = data.queue?.map { $0 == id ? existing.id : $0 }.filter { seen.insert($0).inserted }
             if data.lastID == id { data.lastID = existing.id }
             update(existing.id) { $0.aliases = Array(Set(aliases)) }
             entry = self.entry(existing.id)!
@@ -205,10 +209,26 @@ final class LibraryStore: ObservableObject {
         return self.entry(entry.id)
     }
 
+    var queuedEntries: [Recording] { (data.queue ?? []).compactMap { entry($0) } }
+    func enqueue(_ id: UUID) {
+        guard let entry = entry(id), !entry.isFeed else { return }
+        if !(data.queue ?? []).contains(id) { data.queue = (data.queue ?? []) + [id]; save() }
+    }
+    func removeFromQueue(_ id: UUID) { data.queue?.removeAll { $0 == id }; save() }
+    func clearQueue() { data.queue = []; save() }
+    func takeNextQueued() -> Recording? {
+        while let id = data.queue?.first {
+            data.queue?.removeFirst(); save()
+            if let entry = entry(id), !entry.isFeed { return entry }
+        }
+        return nil
+    }
+
     func delete(_ id: UUID) {
         deletionUndo = data; canUndoDelete = true
         // Keep the local bytes so undo can restore offline audio as well as its metadata.
         data.entries.removeAll { $0.id == id }
+        data.queue?.removeAll { $0 == id }
         if data.lastID == id { data.lastID = nil }
         save()
     }

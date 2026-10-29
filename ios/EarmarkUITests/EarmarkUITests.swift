@@ -10,6 +10,19 @@ final class EarmarkUITests: XCTestCase {
         app.launchEnvironment["EARMARK_UI_TEST_LIBRARY"] = UUID().uuidString
         return app
     }
+    @MainActor func testScrollStartingOnArchiveFileRow() {
+        let app = testApp()
+        app.launchEnvironment["EARMARK_UI_TEST_SCROLL_FIXTURE"] = "1"
+        app.launch(); scrollArchive(app)
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "globalArchiveEntry-")).allElementsBoundByIndex.first { $0.isHittable && $0.frame.midY > 300 && $0.frame.midY < 780 }
+        guard let row else { return XCTFail("Expected a visible archive file row") }
+        let before = row.frame.minY
+        let start = row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -220)))
+        XCTAssertTrue(!row.isHittable || row.frame.minY < before - 40, "A swipe starting on a file must scroll the archive")
+        XCTAssertFalse(app.buttons["Rename"].exists)
+    }
+
     @MainActor func testGlobalAndFolderListeningTabsShareStatus() {
         let app = testApp(); app.launch()
         let link = app.textFields["linkField"]

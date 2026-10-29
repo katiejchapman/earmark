@@ -46,6 +46,7 @@ struct ContentView: View {
     @State private var notice: String?
     @State private var scrub: Double?
     @State private var globalListened = false
+    @AppStorage("archiveNewestFirst") private var newestFirst = true
     @State private var folderListened: [String: Bool] = [:]
     @State private var expandedFolders: Set<String> = []
     @State private var renamingFolder: String?
@@ -117,6 +118,7 @@ struct ContentView: View {
                 player.load(entry)
                 if entry.localFilename == nil { sourceIsFile = false; link = entry.url.absoluteString }
             }
+            Button("Add to queue") { store.enqueue(entry.id) }
             Button("Rename") { editing = entry }
             Button(entry.listened == true ? "Mark as unlistened" : "Mark as listened") {
                 store.setListened(entry.listened != true, for: entry.id)
@@ -340,6 +342,9 @@ struct ContentView: View {
                     }.buttonStyle(.plain).accessibilityLabel(remaining ? "Show total time" : "Show time remaining")
                 }.font(AppType.fixed(12)).monospacedDigit()
                     .protectedStereo("time")
+                if player.visibleScrubReturnPosition != nil {
+                    Button("clear notch") { player.clearScrubReturn() }.font(AppType.fixed(9)).accessibilityIdentifier("clearNotch")
+                }
                 HStack(spacing: 4) {
                     SleepControl(player: player, active: player.sleepActive, dark: dark).equatable().protectedStereo("sleep")
                     Spacer(minLength: 0)
@@ -360,12 +365,12 @@ struct ContentView: View {
                 .background(GeometryReader { geometry in Color.clear.preference(key: StudioFramesKey.self, value: ["decoration": geometry.frame(in: .global)]) })
             HStack(spacing: 10) {
                 Group {
-                    if player.currentID != nil {
+                    if player.playing {
                         Circle().fill(RadialGradient(colors: [Color(hex: 0xffd5cf), Color(hex: 0xff243d), Color(hex: 0x9a0020)], center: .init(x: 0.35, y: 0.3), startRadius: 0, endRadius: 7))
                             .frame(width: 10, height: 10)
                             .overlay(Circle().strokeBorder(.black.opacity(0.5), lineWidth: 1))
                             .shadow(color: .red.opacity(0.85), radius: 5)
-                            .accessibilityLabel("Audio loaded").accessibilityIdentifier("loadedLight")
+                            .accessibilityLabel("Audio playing").accessibilityIdentifier("loadedLight")
                     } else { Color.clear.frame(width: 10, height: 10).accessibilityHidden(true) }
                 }.frame(width: 28, height: 44).protectedStereo("light")
                 Speaker(dark: dark).frame(height: 22)
@@ -412,6 +417,7 @@ struct ContentView: View {
                 .frame(width: size, height: size, alignment: .center)
                 .foregroundStyle(main ? Color(hex: 0x583346) : Color(hex: dark ? 0xfaf2f7 : 0x303831))
                 .background(Color(hex: main ? 0xdfa3bf : (dark ? 0x66656e : 0xd3d7ce)), in: Circle())
+                .shadow(color: .black.opacity(0.5), radius: 0.5, x: 0, y: 3)
                 .overlay(Circle().strokeBorder(Color(hex: main ? 0xb97998 : (dark ? 0x928693 : 0x858c82)), lineWidth: main ? 3 : 1))
         }.frame(height: 44).buttonStyle(.plain).accessibilityLabel(label).disabled(player.currentID == nil)
     }
@@ -431,6 +437,8 @@ struct ContentView: View {
                     Image(systemName: "plus").frame(width: 44, height: 44)
                 }.accessibilityLabel("Create folder")
                 Menu {
+                    Button(newestFirst ? "Date added: newest first ✓" : "Date added: newest first") { newestFirst = true }
+                    Button(!newestFirst ? "Date added: oldest first ✓" : "Date added: oldest first") { newestFirst = false }
                     Button("Export library", systemImage: "square.and.arrow.up") {
                         do { player.savePosition(); backup = LibraryDocument(data: try store.exportData()); exporting = true }
                         catch { notice = error.localizedDescription }
@@ -441,13 +449,38 @@ struct ContentView: View {
             if store.data.entries.isEmpty && store.data.folders.isEmpty {
                 Text("Your pasted links will appear here.").font(AppType.font(.subheadline)).foregroundStyle(.secondary).padding(.vertical, 10)
             }
+            if !store.queuedEntries.isEmpty {
+                HStack {
+                    Text("queue").font(AppType.font(.subheadline, weight: 600))
+                    Spacer()
+                    Button("clear") { store.clearQueue() }.accessibilityLabel("Clear queue")
+                }
+                ForEach(store.queuedEntries) { entry in
+                    HStack {
+                        Button { store.removeFromQueue(entry.id); player.load(entry, autoplay: true) } label: {
+                            Text(entry.title).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        Button { store.removeFromQueue(entry.id) } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel("Remove from queue")
+                    }.font(AppType.font(.subheadline)).frame(minHeight: 44)
+                }
+            }
             ForEach(store.data.folders, id: \.self) { folderView($0) }
             folderView(nil)
             statusTabs(store.data.entries, selected: $globalListened, scope: "global")
                 .padding(.top, 8)
-            ForEach(store.data.entries.filter { ($0.listened == true) == globalListened }) { entry in
+            ForEach(ordered(store.data.entries.filter { ($0.listened == true) == globalListened })) { entry in
                 archiveRow(entry, showFolder: true)
             }
+        }
+    }
+    private func ordered(_ entries: [Recording]) -> [Recording] {
+        // Legacy records retain their archive order; no guessed dates are written.
+        let indices = Dictionary(uniqueKeysWithValues: store.data.entries.enumerated().map { ($0.element.id, $0.offset) })
+        return entries.sorted {
+            let a = $0.addedAt ?? .distantPast, b = $1.addedAt ?? .distantPast
+            if a != b { return newestFirst ? a > b : a < b }
+            return newestFirst ? indices[$0.id, default: 0] < indices[$1.id, default: 0] : indices[$0.id, default: 0] > indices[$1.id, default: 0]
         }
     }
     private func createFolder() { _ = store.addFolder(folder); folder = "" }
@@ -501,7 +534,7 @@ struct ContentView: View {
             if expandedFolders.contains(key) {
                 statusTabs(entries, selected: Binding(get: { folderListened[key] ?? false }, set: { folderListened[key] = $0 }), scope: "folder-\(key)")
                     .padding(.horizontal, 15)
-                ForEach(entries.filter { ($0.listened == true) == (folderListened[key] ?? false) }) { entry in
+                ForEach(ordered(entries.filter { ($0.listened == true) == (folderListened[key] ?? false) })) { entry in
                     archiveRow(entry)
                 }
             }
@@ -547,6 +580,7 @@ struct ContentView: View {
                             }.accessibilityHidden(true)
                         }
                     }
+                    if let added = entry.addedAt { Text(added, format: .dateTime.month(.abbreviated).day().year()).font(AppType.font(.caption2)).foregroundStyle(.secondary) }
                     Text(showFolder ? (entry.folder ?? "inbox") : (entry.show.isEmpty ? (entry.localFilename == nil ? (entry.url.host ?? "Audio") : "Audio file") : entry.show))
                         .font(AppType.font(.caption1)).foregroundStyle(.secondary)
                 }
@@ -566,29 +600,20 @@ struct ContentView: View {
         .accessibilityValue(entry.listened == true ? "Listened" : (entry.isFeed ? "Not listened" : "Not listened, \(percent) played"))
         .accessibilityIdentifier("\(showFolder ? "globalArchiveEntry" : "archiveEntry")-\(entry.id)")
         .opacity(draggingID == entry.id ? 0.4 : 1)
-        .highPriorityGesture(archiveDrag(entry).simultaneously(with: TapGesture().onEnded { archiveActions = entry }))
+        .onTapGesture { archiveActions = entry }
+        .background(ArchiveHoldDrag(changed: { point in
+            draggingID = entry.id; dragLocation = point
+            dropTargetFolder = folderFrames.first(where: { $0.value.contains(point) })?.key
+        }, ended: { point in
+            if let point, let folder = folderFrames.first(where: { $0.value.contains(point) })?.key,
+               store.entry(entry.id) != nil, store.data.folders.contains(folder) { store.move(entry.id, to: folder) }
+            draggingID = nil; dropTargetFolder = nil
+        }))
     }
     private func toggleFolder(_ key: String) {
         withAnimation {
             if !expandedFolders.insert(key).inserted { expandedFolders.remove(key) }
         }
-    }
-    private func archiveDrag(_ entry: Recording) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
-            .onChanged { value in
-                guard case .second(true, let drag?) = value else { return }
-                draggingID = entry.id; dragLocation = drag.location
-                dropTargetFolder = folderFrames.first(where: { $0.value.contains(drag.location) })?.key
-            }
-            .onEnded { value in
-                if case .second(true, let drag?) = value,
-                   let folder = folderFrames.first(where: { $0.value.contains(drag.location) })?.key,
-                   store.data.folders.contains(folder), store.entry(entry.id) != nil {
-                    withAnimation { store.move(entry.id, to: folder) }
-                }
-                draggingID = nil; dropTargetFolder = nil
-            }
     }
     static func time(_ value: Double) -> String {
         let seconds = Int(value.isFinite ? max(0, value) : 0)
@@ -626,11 +651,13 @@ private struct LinkInput: UIViewRepresentable {
         func textFieldDidBeginEditing(_ textField: UITextField) { if !parent.focused { parent.focused = true } }
         func textFieldDidEndEditing(_ textField: UITextField) { if parent.focused { parent.focused = false } }
         func textFieldShouldReturn(_ textField: UITextField) -> Bool { parent.onSubmit(); return true }
+        func textFieldShouldClear(_ textField: UITextField) -> Bool { parent.text = ""; return true }
     }
     func makeCoordinator() -> Coordinator { Coordinator(self) }
     func makeUIView(context: Context) -> Field {
         let field = Field()
         field.placeholder = "enter link"
+        field.clearButtonMode = .whileEditing
         field.accessibilityIdentifier = "linkField"
         field.font = AppType.uiFont(.subheadline)
         field.adjustsFontForContentSizeCategory = true
@@ -671,16 +698,16 @@ private struct SleepControl: View, Equatable {
         } label: {
             Text("sleep").font(AppType.fixed(10)).frame(width: 50, height: 26)
                 .foregroundStyle(active ? Color(hex: 0x583346) : Color.primary)
-                .background(active ? rose : Color.clear, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
+                .background(active ? rose : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color(hex: dark ? 0x928693 : 0x858c82)))
                 .frame(minHeight: 44).contentShape(Rectangle())
-        }.buttonStyle(.automatic).accessibilityLabel("Sleep timer").accessibilityIdentifier("sleepTimer")
+        }.buttonStyle(.plain).accessibilityLabel("Sleep timer").accessibilityIdentifier("sleepTimer")
     }
 }
 
 private struct Disc: View {
     var body: some View {
-        Image("Disc").resizable().scaledToFit()
+        Image("Disc").resizable().renderingMode(.original).scaledToFit().environment(\.colorScheme, .light)
     }
 }
 
@@ -867,5 +894,54 @@ private extension View {
         background(GeometryReader { geometry in
             Color.clear.preference(key: StudioFramesKey.self, value: ["protected-" + name: geometry.frame(in: .global)])
         })
+    }
+}
+
+// UIKit recognizes a held drag without claiming ordinary vertical swipes from the list.
+private struct ArchiveHoldDrag: UIViewRepresentable {
+    let changed: (CGPoint) -> Void
+    let ended: (CGPoint?) -> Void
+    func makeUIView(context: Context) -> ArchiveHoldView { ArchiveHoldView() }
+    func updateUIView(_ view: ArchiveHoldView, context: Context) { view.changed = changed; view.ended = ended }
+}
+private final class ArchiveHoldView: UIView, UIGestureRecognizerDelegate {
+    var changed: ((CGPoint) -> Void)?
+    var ended: ((CGPoint?) -> Void)?
+    private weak var scroll: UIScrollView?
+    private lazy var hold: UILongPressGestureRecognizer = {
+        let gesture = UILongPressGestureRecognizer(target: self, action: #selector(dragged(_:)))
+        gesture.minimumPressDuration = 0.35; gesture.allowableMovement = 10; gesture.delegate = self
+        return gesture
+    }()
+    override func willMove(toWindow newWindow: UIWindow?) {
+        window?.removeGestureRecognizer(hold)
+        scroll?.isScrollEnabled = true; scroll = nil
+        if newWindow == nil { ended?(nil) }
+        super.willMove(toWindow: newWindow)
+    }
+    override func didMoveToWindow() { super.didMoveToWindow(); window?.addGestureRecognizer(hold) }
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard window != nil, !isHidden else { return false }
+        return bounds.contains(touch.location(in: self))
+    }
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        other.view is UIScrollView
+    }
+    @objc private func dragged(_ gesture: UILongPressGestureRecognizer) {
+        let point = gesture.location(in: window)
+        switch gesture.state {
+        case .began:
+            var ancestor = superview
+            while let view = ancestor {
+                if let scroll = view as? UIScrollView { self.scroll = scroll; scroll.isScrollEnabled = false; break }
+                ancestor = view.superview
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            changed?(point)
+        case .changed: changed?(point)
+        case .ended: scroll?.isScrollEnabled = true; scroll = nil; ended?(point)
+        case .cancelled, .failed: scroll?.isScrollEnabled = true; scroll = nil; ended?(nil)
+        default: break
+        }
     }
 }

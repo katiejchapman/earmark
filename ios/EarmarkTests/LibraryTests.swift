@@ -65,6 +65,13 @@ final class LibraryTests: XCTestCase {
             XCTAssertEqual(visible.first?.rotation, safe.rotation)
             XCTAssertLessThan(visible.first?.size ?? 100, safe.size)
             XCTAssertEqual(saved.gems.count, 5) // Filtering never edits the saved app layout.
+            let larger = saved.widgetGems(in: size, band: layout.decoration)
+            XCTAssertEqual(larger.count, small ? 2 : 3)
+            for gem in larger {
+                XCTAssertTrue(layout.decoration.contains(gem.footprint(in: size)))
+                XCTAssertFalse(layout.protectedRects.contains { $0.intersects(gem.footprint(in: size)) })
+                XCTAssertGreaterThan(gem.size, 18 * min(size.width / 362, size.height / 365))
+            }
         }
         var state = WidgetSnapshot.empty
         let now = Date(); state.updated = now; state.position = 20; state.duration = 200; state.playing = true
@@ -146,7 +153,7 @@ final class LibraryTests: XCTestCase {
         XCTAssertTrue(studio.place(start))
         var target = start; target.x = 0.9; target.y = 0.6
         let stopped = studio.limitedMotion(from: start, to: target)
-        XCTAssertEqual(stopped.x * 320, 126, accuracy: 1)
+        XCTAssertEqual(stopped.x * 320, 129.5, accuracy: 1)
         XCTAssertEqual(stopped.y, 0.6, accuracy: 0.002)
         XCTAssertTrue(studio.canPlace(stopped))
         XCTAssertTrue(studio.place(stopped))
@@ -326,6 +333,21 @@ final class LibraryTests: XCTestCase {
         player.cancelSleepTimer()
     }
 
+    @MainActor func testQueuePersistsAndClearKeepsArchive() throws {
+        let file = temporaryFile()
+        let store = LibraryStore(file: file)
+        let first = try store.remember("https://example.com/first.mp3")
+        let second = try store.remember("https://example.com/second.mp3")
+        store.enqueue(first.id); store.enqueue(first.id); store.enqueue(second.id)
+        XCTAssertEqual(store.queuedEntries.map(\.id), [first.id, second.id])
+        let reopened = LibraryStore(file: file)
+        XCTAssertEqual(reopened.takeNextQueued()?.id, first.id)
+        reopened.clearQueue()
+        XCTAssertTrue(reopened.queuedEntries.isEmpty)
+        XCTAssertEqual(reopened.data.entries.count, 2)
+        XCTAssertNotNil(reopened.entry(first.id)?.addedAt)
+    }
+
     @MainActor func testLargeSeekCanReturnAndSleepPausesPlayback() async throws {
         let library = temporaryFile()
         let directory = library.deletingLastPathComponent()
@@ -365,9 +387,14 @@ final class LibraryTests: XCTestCase {
         player.seek(120)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertNotNil(player.visibleScrubReturnPosition)
-        player.expireScrubReturnIfNeeded(now: Date().addingTimeInterval(31))
+        // Loading another item and returning must retain the saved notch.
+        player.stop()
+        player.restoreLast()
+        for _ in 0..<100 where player.loading { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertNotNil(player.visibleScrubReturnPosition)
+        XCTAssertNotNil(store.entry(entry.id)?.scrubReturnPosition)
+        player.clearScrubReturn()
         XCTAssertNil(player.visibleScrubReturnPosition)
-        XCTAssertNil(store.entry(entry.id)?.scrubReturnPosition)
         player.play()
         for _ in 0..<50 where !player.playing { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertTrue(player.playing)

@@ -50,6 +50,19 @@ struct WidgetDecorations: Codable, Equatable {
     var height: Double
     var gems: [WidgetGem]
     static var empty: Self { Self(width: 362, height: 365, gems: []) }
+    // Keep a representative subset of the saved sheet, enlarged into the free metal band.
+    func widgetGems(in size: CGSize, band: CGRect) -> [WidgetGem] {
+        let count = min(size.width < 200 ? 2 : 3, gems.count)
+        guard count > 0 else { return [] }
+        return gems.prefix(count).enumerated().map { index, original in
+            var gem = original
+            let rotatedScale = abs(cos(gem.rotation * .pi / 180)) + abs(sin(gem.rotation * .pi / 180))
+            gem.size = min(26, band.height / max(1, rotatedScale))
+            gem.x = (band.minX + band.width * Double(index + 1) / Double(count + 1)) / size.width
+            gem.y = band.midY / size.height
+            return gem
+        }
+    }
     // Preserve relative positions and rotation, shrink uniformly, and omit only
     // gems whose rotated artwork would cover a widget control or another gem.
     func visible(in size: CGSize, obstacles: [CGRect]) -> [WidgetGem] {
@@ -81,7 +94,7 @@ struct WidgetStereoLayout {
     init(size: CGSize, small: Bool) {
         inset = small ? 12 : 16; gap = small ? 4 : 5
         let jewelHeight = small ? 7.0 : 9.0, footerHeight = small ? 12.0 : 15.0
-        let bandHeight = 14.0, timeHeight = 17.0, controlsHeight = 30.0
+        let bandHeight = 27.0, timeHeight = 17.0, controlsHeight = 30.0
         let lcdHeight = max(24, size.height - 22 - gap * 5 - jewelHeight - timeHeight - controlsHeight - bandHeight - footerHeight)
         let width = max(0, size.width - inset * 2)
         jewels = CGRect(x: inset, y: 11, width: width, height: jewelHeight)

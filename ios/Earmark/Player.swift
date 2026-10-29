@@ -10,7 +10,8 @@ final class AudioPlayer: ObservableObject {
     @Published private(set) var position: Double = 0
     @Published private(set) var duration: Double = 0
     @Published var message: String?
-    private let store: LibraryStore
+    let store: LibraryStore
+    static var widgetInstance: AudioPlayer?
     private let player = AVPlayer()
     private var status: NSKeyValueObservation?
     private var playbackStatus: NSKeyValueObservation?
@@ -25,19 +26,10 @@ final class AudioPlayer: ObservableObject {
     private var source: URL?
     @Published private(set) var sleepDeadline: Date?
     @Published private(set) var sleepRemaining: Double = 0
-    @Published private(set) var scrubReturnDeadline: Date?
-    private var scrubReturnTask: Task<Void, Never>?
-    var visibleScrubReturnPosition: Double? {
-        guard let deadline = scrubReturnDeadline, deadline > Date() else { return nil }
-        return current?.scrubReturnPosition
-    }
-    func expireScrubReturnIfNeeded(now: Date = Date()) {
-        guard let deadline = scrubReturnDeadline, now >= deadline else { return }
-        clearScrubReturn()
-    }
-    private func clearScrubReturn() {
+    var visibleScrubReturnPosition: Double? { current?.scrubReturnPosition }
+    // A saved notch persists until explicitly cleared or used, including across launches.
+    func clearScrubReturn() {
         if let id = currentID { store.setScrubReturnPosition(nil, for: id) }
-        scrubReturnDeadline = nil; scrubReturnTask?.cancel(); scrubReturnTask = nil
     }
     private var sleepTask: Task<Void, Never>?
 
@@ -104,6 +96,7 @@ final class AudioPlayer: ObservableObject {
                 self.wantsPlayback = false; self.playing = false; self.syncSleepCountdown()
                 if let id = self.currentID { self.store.setPosition(0, for: id) }
                 self.updateNowPlaying()
+                if let next = self.store.takeNextQueued() { self.load(next, autoplay: true) }
             }
         })
         notifications.append(NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] event in
@@ -134,7 +127,6 @@ final class AudioPlayer: ObservableObject {
 
     func load(_ entry: Recording, autoplay: Bool = false, refresh: Bool = false) {
         pauseSleepCountdown()
-        clearScrubReturn()
         savePosition(); player.pause(); loadTask?.cancel()
         status = nil; player.replaceCurrentItem(with: nil)
         generation = UUID(); let token = generation
@@ -230,7 +222,6 @@ final class AudioPlayer: ObservableObject {
     }
     func pause() { wantsPlayback = false; pauseSleepCountdown(); player.pause(); savePosition(); updateNowPlaying() }
     func stop() {
-        clearScrubReturn()
         cancelSleepTimer()
         savePosition(); loadTask?.cancel(); generation = UUID(); status = nil
         player.pause(); player.replaceCurrentItem(with: nil)
@@ -248,15 +239,8 @@ final class AudioPlayer: ObservableObject {
         guard !restoring, duration > 0 else { return }
         let target = max(0, min(duration, seconds)); let token = generation
         if let id = currentID {
-            expireScrubReturnIfNeeded()
             if rememberPrevious && visibleScrubReturnPosition == nil && abs(target - position) >= 60 {
                 store.setScrubReturnPosition(position, for: id)
-                scrubReturnDeadline = Date().addingTimeInterval(30)
-                scrubReturnTask?.cancel()
-                scrubReturnTask = Task { [weak self] in
-                    do { try await Task.sleep(for: .seconds(30)) } catch { return }
-                    self?.expireScrubReturnIfNeeded()
-                }
             }
             // Persist the intended destination before an asynchronous seek can be interrupted.
             store.setPosition(target, for: id)
@@ -273,7 +257,6 @@ final class AudioPlayer: ObservableObject {
         guard !restoring, duration > 0, let entry = current, let saved = visibleScrubReturnPosition else { return }
         seek(saved, rememberPrevious: false)
         store.setScrubReturnPosition(nil, for: entry.id)
-        scrubReturnDeadline = nil; scrubReturnTask?.cancel(); scrubReturnTask = nil
     }
     func skip(_ seconds: Double) { seek(position + seconds) }
     func savePosition() {
@@ -282,7 +265,6 @@ final class AudioPlayer: ObservableObject {
         if seconds.isFinite { store.setPosition(duration > 0 && seconds >= duration - 0.1 ? 0 : seconds, for: id); lastSaved = seconds }
     }
     private func tick() {
-        expireScrubReturnIfNeeded()
         if let deadline = sleepDeadline {
             sleepRemaining = max(0, deadline.timeIntervalSinceNow)
             if sleepRemaining <= 0 { expireSleepTimer() }

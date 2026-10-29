@@ -1,6 +1,7 @@
 import SwiftUI
 import WidgetKit
 import AppIntents
+import UIKit
 
 private struct StereoEntry: TimelineEntry {
     let date: Date
@@ -36,9 +37,21 @@ private struct StereoProvider: AppIntentTimelineProvider {
 
 struct StereoWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let state: WidgetSnapshot
     let date: Date
     private var small: Bool { family == .systemSmall }
+    private static let progressPixel: UIImage = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { context in
+        UIColor(red: 0.72, green: 0.32, blue: 0.50, alpha: 1).setFill()
+        context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+    }
+    private static let tintedScreenPixel: UIImage = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { context in
+        UIColor(red: 0.12, green: 0.17, blue: 0.11, alpha: 1).setFill()
+        context.fill(CGRect(x: 0, y: 0, width: 2, height: 2))
+    }
+    private var lcdColors: [Color] {
+        [Color(red: 0.69, green: 0.74, blue: 0.64), Color(red: 0.60, green: 0.65, blue: 0.55)]
+    }
     private let pink = Color(red: 0.87, green: 0.64, blue: 0.75)
     private var ink: Color { state.dark ? Color.white.opacity(0.9) : Color(red: 0.24, green: 0.27, blue: 0.25) }
     private var metal: [Color] { state.dark ? [Color(white: 0.58), Color(red: 0.32, green: 0.34, blue: 0.38), Color(white: 0.49), Color(white: 0.25)] : [Color(white: 0.94), Color(red: 0.75, green: 0.77, blue: 0.74), Color(white: 0.88), Color(red: 0.65, green: 0.68, blue: 0.65)] }
@@ -49,7 +62,7 @@ struct StereoWidgetView: View {
                 HStack(spacing: 0) {
                     ForEach(0..<11, id: \.self) { i in
                         if i > 0 { Spacer(minLength: 1) }
-                        Image("RoundRhinestone").resizable().scaledToFit().frame(width: small ? 7 : 9, height: small ? 7 : 9)
+                        Image("RoundRhinestone").resizable().preserveWidgetColor().scaledToFit().frame(width: small ? 7 : 9, height: small ? 7 : 9)
                     }
                 }.frame(height: layout.jewels.height).padding(.horizontal, small ? 5 : 22)
                 VStack(alignment: .leading, spacing: 4) {
@@ -64,15 +77,21 @@ struct StereoWidgetView: View {
                         }
                     }.font(.system(size: small ? 7 : 9, design: .monospaced))
                 }
-                .foregroundStyle(Color(red: 0.20, green: 0.27, blue: 0.17))
+                .foregroundStyle(renderingMode == .fullColor ? Color(red: 0.20, green: 0.27, blue: 0.17) : Color.primary)
                 .padding(.horizontal, 9).frame(maxWidth: .infinity).frame(height: layout.lcd.height, alignment: .leading)
-                .background(LinearGradient(colors: [Color(red: 0.69, green: 0.74, blue: 0.64), Color(red: 0.60, green: 0.65, blue: 0.55)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 9))
+                .background {
+                    if renderingMode == .fullColor {
+                        RoundedRectangle(cornerRadius: 9).fill(LinearGradient(colors: lcdColors, startPoint: .topLeading, endPoint: .bottomTrailing))
+                    } else {
+                        Image(uiImage: Self.tintedScreenPixel).resizable().preserveWidgetColor().clipShape(RoundedRectangle(cornerRadius: 9))
+                    }
+                }
                 .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(LinearGradient(colors: [.black.opacity(0.5), .white.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 3))
                 VStack(spacing: 3) {
                     GeometryReader { bar in
                         let ratio = state.duration > 0 ? min(1, state.position(at: date) / state.duration) : 0
                         Capsule().fill(.black.opacity(0.4))
-                        Capsule().fill(Color(white: 0.83)).frame(width: bar.size.width * ratio)
+                        Image(uiImage: Self.progressPixel).resizable().preserveWidgetColor().frame(width: bar.size.width * ratio).clipShape(Capsule())
                         Circle().fill(LinearGradient(colors: [.white, .gray], startPoint: .topLeading, endPoint: .bottomTrailing))
                             .frame(width: 8, height: 8).offset(x: max(0, min(bar.size.width - 8, bar.size.width * ratio - 4)), y: -2)
                     }.frame(height: 4)
@@ -87,12 +106,12 @@ struct StereoWidgetView: View {
                     transport("«15", action: "back")
                     transport(state.playing ? "Ⅱ" : "▶", action: "toggle", main: true)
                     transport("15»", action: "forward")
-                    Spacer(minLength: 0); auxiliary("reset", action: "reset")
+                    Spacer(minLength: 0)
                 }.frame(height: layout.controls.height)
                 Color.clear.frame(height: layout.decoration.height)
                 HStack(spacing: 9) {
-                    Circle().fill(state.loaded ? Color.red : .clear).frame(width: 6, height: 6)
-                        .shadow(color: state.loaded ? .red.opacity(0.85) : .clear, radius: 3).frame(width: 14)
+                    Circle().fill(state.playing ? Color.red : .clear).frame(width: 6, height: 6)
+                        .shadow(color: state.playing ? .red.opacity(0.85) : .clear, radius: 3).frame(width: 14)
                     Canvas { context, size in
                         for x in stride(from: 1.0, to: size.width, by: 4) {
                             for y in stride(from: 1.0, to: size.height, by: 4) {
@@ -100,22 +119,21 @@ struct StereoWidgetView: View {
                             }
                         }
                     }.background(.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 5)).clipShape(RoundedRectangle(cornerRadius: 5))
-                    Link(destination: url("decorate")) {
-                        StickerSheetIcon().frame(width: 18, height: 18)
-                    }.accessibilityLabel("Open sticker sheet")
                 }.frame(height: layout.footer.height)
             }
             .padding(.horizontal, layout.inset).padding(.vertical, 11)
             .frame(width: geometry.size.width, height: geometry.size.height)
             .overlay {
-                ForEach(state.decorations.visible(in: geometry.size, obstacles: layout.protectedRects)) { gem in
-                    Image(gem.asset).resizable().scaledToFit().frame(width: gem.size, height: gem.size)
+                ForEach(state.decorations.widgetGems(in: geometry.size, band: layout.decoration)) { gem in
+                    Image(gem.asset).resizable().preserveWidgetColor().scaledToFit().frame(width: gem.size, height: gem.size)
                         .rotationEffect(.degrees(gem.rotation))
                         .position(x: geometry.size.width * gem.x, y: geometry.size.height * gem.y)
                 }.allowsHitTesting(false)
             }
         }
         .foregroundStyle(ink)
+        .environment(\.colorScheme, state.dark ? .dark : .light)
+        .unredacted()
         .containerBackground(for: .widget) { LinearGradient(colors: metal, startPoint: .topLeading, endPoint: .bottomTrailing) }
         .widgetURL(url("open"))
     }
@@ -125,13 +143,13 @@ struct StereoWidgetView: View {
         return s >= 3600 ? String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60) : String(format: "%d:%02d", s / 60, s % 60)
     }
     private func transport(_ text: String, action: String, main: Bool = false) -> some View {
-        Link(destination: url(action)) {
+        Button(intent: StereoPlaybackIntent(action: action)) {
             Text(text).font(.system(size: main ? 12 : 9, weight: .semibold, design: .rounded))
                 .frame(width: main ? 30 : 24, height: main ? 30 : 24)
                 .foregroundStyle(main ? Color(red: 0.35, green: 0.20, blue: 0.28) : Color.white)
                 .background(main ? pink : Color(white: 0.28), in: Circle())
                 .overlay(Circle().strokeBorder(main ? Color(red: 0.72, green: 0.47, blue: 0.60) : Color(white: 0.65), lineWidth: 1))
-        }.accessibilityLabel(action == "toggle" ? "Open player and play or pause" : "Open player and skip 15 seconds")
+        }.buttonStyle(.plain).accessibilityLabel(action == "toggle" ? (state.playing ? "Pause" : "Play") : "Skip 15 seconds")
     }
     private func auxiliary(_ text: String, action: String) -> some View {
         Link(destination: url(action)) {
@@ -148,8 +166,16 @@ struct EarmarkStereoWidget: Widget {
             StereoWidgetView(state: entry.state, date: entry.date)
         }
         .configurationDisplayName("earmark")
+        .containerBackgroundRemovable(false)
         .description("Your mini stereo. Tap to open earmark and control your audio.")
         .supportedFamilies([.systemSmall, .systemMedium])
         .contentMarginsDisabled()
+    }
+}
+
+private extension Image {
+    @ViewBuilder func preserveWidgetColor() -> some View {
+        if #available(iOS 18.0, *) { self.widgetAccentedRenderingMode(.fullColor) }
+        else { self }
     }
 }

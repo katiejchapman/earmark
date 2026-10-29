@@ -94,7 +94,7 @@ final class StickerStudioStore: ObservableObject {
         } catch { self.error = "Couldn’t save decorations: \(error.localizedDescription)" }
     }
     func changePage(_ delta: Int) { page = min(pageCount - 1, max(0, page + delta)) }
-    // Collision checks include the rotated artwork, a four-point gap, and every protected control.
+    // Collision checks include the rotated artwork, a minimal gap, and every protected control.
     private func footprint(_ gem: PlacedGem, in size: CGSize) -> CGRect {
         let radians = gem.rotation * .pi / 180
         let side = gem.size * (abs(cos(radians)) + abs(sin(radians)))
@@ -104,8 +104,8 @@ final class StickerStudioStore: ObservableObject {
         guard let size = layoutSize else { return true }
         let rect = footprint(gem, in: size)
         guard CGRect(origin: .zero, size: size).insetBy(dx: 7, dy: 7).contains(rect),
-              !blocked.contains(where: { $0.insetBy(dx: -4, dy: -4).intersects(rect) }) else { return false }
-        return !(others ?? draft).contains { $0.id != gem.id && footprint($0, in: size).insetBy(dx: -4, dy: -4).intersects(rect) }
+              !blocked.contains(where: { $0.insetBy(dx: -0.25, dy: -0.25).intersects(rect) }) else { return false }
+        return !(others ?? draft).contains { $0.id != gem.id && footprint($0, in: size).insetBy(dx: -0.25, dy: -0.25).intersects(rect) }
     }
     // Subpixel swept movement prevents tunnelling through a thin protected area.
     // Resolve translation per axis so a gem can slide along the edge it reaches.
@@ -172,6 +172,8 @@ final class StickerStudioStore: ObservableObject {
     func updateLayout(stereo: CGRect?, decoration: CGRect? = nil, obstacles: [CGRect]) {
         guard let stereo, stereo.width > 0, stereo.height > 0 else { return }
         let local = obstacles.map { $0.offsetBy(dx: -stereo.minX, dy: -stereo.minY) }
+        // List virtualization can briefly omit preference frames; never erase known controls.
+        if local.isEmpty, !blocked.isEmpty { return }
         guard layoutSize != stereo.size || blocked != local else { return }
         layoutSize = stereo.size; blocked = local
         if pristine, let decoration {
@@ -485,6 +487,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
     }
     private func paint() {
         guard var current = session, !current.paging, !current.gem.asset.isEmpty, let studio else { ghost.isHidden = true; return }
+        studio.updateLayout(stereo: frames["stereo"], decoration: frames["decoration"], obstacles: frames.filter { $0.key.hasPrefix("protected-") }.map { $0.value })
         let overTrash = current.existing && local("trash")?.insetBy(dx: -8, dy: -8).contains(current.center) == true
         if let stereo = local("stereo"), !overTrash {
             var proposed = current.gem
@@ -509,6 +512,7 @@ final class StickerTouchView: UIView, UIGestureRecognizerDelegate {
         guard var current = session, let studio else { return }
         defer { session = nil; ghost.isHidden = true; studio.activeID = nil; displayLink?.invalidate(); displayLink = nil }
         guard !cancelled else { return }
+        studio.updateLayout(stereo: frames["stereo"], decoration: frames["decoration"], obstacles: frames.filter { $0.key.hasPrefix("protected-") }.map { $0.value })
         if current.paging {
             let delta = current.pageDelta
             if abs(delta) > 25 { withAnimation(.easeOut(duration: 0.15)) { studio.changePage(delta < 0 ? 1 : -1) } }
